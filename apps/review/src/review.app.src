@@ -1,0 +1,9 @@
+{application, review,
+ [
+  {description, "N2O VXZ Sample App"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [kernel, stdlib, n2o, kvs, db]},
+  {mod, { web_app, []}},
+  {env, []}
+ ]}.
