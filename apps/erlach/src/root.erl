@@ -17,7 +17,7 @@
 % -endif.
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
-main()    -> #dtl{file="erlach",app=review,bindings=[{body,body()}, {theme,<<"glassy">>}, {title,<<"Erlach">>}]}. %html:page(<<"Erlach">>,body(),glassy).
+main()    -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"glassy">>}, {title,<<"Erlach">>}]}. %html:page(<<"Erlach">>,body(),glassy).
 body() ->
 	% Session = ?CTX#cx.session,
 	% User = case wf:user() of
@@ -44,10 +44,6 @@ body() ->
 				wf:html_encode(wf:f(" - ~s", [Name]))] }
         ]}
         end, kvs:all(board)),
-    % {ok, Svg} = file:read_file("apps/review/priv/static/svg/erlach-board-list-3.svg"),
-    % wf:info(?MODULE, "~p", [file:get_cwd()]),
-	% wf:wire(#event{target="logout", postback=logout, type=click, source=[]}),
-	% "<svg style='width:20px; fill:red;'><use xlink:href='#ei-arrow-right-icon'></use></svg>",	
 	html:body(#panel{ class= <<"board-list">>, body=
 			% #span{ body=wf:f("Session: ~p<br/>User: ~p<br/>User 2: ~p", [Session,User,User2])},
 			% [Boards,#span{ class= <<"helo">>, body = <<"Coming soon!">>}]}).

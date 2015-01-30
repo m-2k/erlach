@@ -23,7 +23,7 @@ main()    ->
 	% wf:info(?MODULE,"Peer: ~p",[wf:peer(?REQ)]),
 	R = avz:callbacks([twitter]),
 	% wf:info(?MODULE, "DEBUG:~p ~p", ['3-1', R]),
-	#dtl{file="erlach",app=review,bindings=[{body,body()}, {title,<<"Profile">>}]}.
+	#dtl{file="erlach",app=erlach,bindings=[{body,body()}, {title,<<"Profile">>}]}.
 	
 names_list() ->
 	#panel{class= <<"flex-vertical">>, body = [

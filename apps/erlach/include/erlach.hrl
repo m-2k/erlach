@@ -3,7 +3,7 @@
 -define(BOARD_ID, board_id).
 -define(THREAD_ID, thread_id).
 -define(USER_ID, anonymous).
--define(SITE_ROOT_LOCATION, "apps/review/priv").
+-define(SITE_ROOT_LOCATION, "apps/erlach/priv").
 -define(ATTACHMENT_LOCATION, "static/attachments").
 -define(STORED_POST_ID, stored_post_id).
 -define(STORED_REQUEST_TO, stored_request_to).

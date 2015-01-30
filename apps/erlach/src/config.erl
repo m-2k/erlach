@@ -4,7 +4,7 @@
 log_modules() ->
   [
     % n2o_websocket,
-	n2o_document,
+    % n2o_document,
     n2o_query,
     n2o_bullet,
     % login,
@@ -26,10 +26,11 @@ log_modules() ->
 	avz,
 	wf_convert,
 	image,
-	u
+	u,
+    guard
     % n2o_binary
   ].
 
-websocket_port() -> {ws, 8000, wss, 443}.
+debug() -> false.
 
 info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).

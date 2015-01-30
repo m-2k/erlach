@@ -1,9 +1,9 @@
-{application, review,
+{application, erlach,
  [
   {description, "N2O VXZ Sample App"},
   {vsn, "1"},
   {registered, []},
-  {applications, [kernel, stdlib, n2o, kvs, db]},
+  {applications, [kernel, stdlib, n2o, kvs, db, avz]},
   {mod, { web_app, []}},
   {env, []}
  ]}.

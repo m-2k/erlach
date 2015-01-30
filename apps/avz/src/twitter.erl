@@ -5,7 +5,7 @@
 -include_lib("kvs/include/user.hrl").
 
 -include_lib("db/include/user.hrl").
--include_lib("review/include/erlach.hrl").
+% -include_lib("erlach/include/erlach.hrl").
 
 -compile(export_all).
 -export(?API).
@@ -49,17 +49,20 @@ email_prop(Props, twitter) -> proplists:get_value(<<"screen_name">>, Props).
 callback() ->
     Token = wf:q(<<"oauth_token">>),
     Verifier =wf:q(<<"oauth_verifier">>),
-	User = wf:user(),
-	wf:info(?MODULE, "Callback (twitter). User:~p~nToken:~p~nVerifier:~p",[User,Token,Verifier]),
-    Authorized = case User of
-		#user3{id={?T,_ID}} -> false;
-		#user3{} -> true;
-		_ -> false
-	end,
-	case {Authorized, Token, Verifier} of
+    % User = wf:user(),
+    % wf:info(?MODULE, "Callback (twitter). User:~p~nToken:~p~nVerifier:~p",[User,Token,Verifier]),
+    %     Authorized = case User of
+    %     #user3{id={?T,_ID}} -> false;
+    %     #user3{} -> true;
+    %     _ -> false
+    % end,
+    %
+    % wf:info(?MODULE, "USER: Authorized:~p Is Temp: ~p",[Authorized,u:is_temp(User)]),
+    
+	case {u:is_temp(), Token, Verifier} of
 		{_, undefined, _} -> skip;
 		{_, _, undefined} -> skip;
-		{false, _, _} ->
+		{true, _, _} ->
 			case get_access_token(binary_to_list(Token), binary_to_list(Verifier)) of
 				not_authorized -> skip;
 				Props -> UserData = show(Props), avz:login(twitter, UserData#struct.lst)

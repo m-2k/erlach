@@ -13,7 +13,7 @@
 -include("erlach.hrl").
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
-main()    -> #dtl{file="bpg",app=review,bindings=[{title,"BPG"}]}.
+main()    -> #dtl{file="bpg",app=erlach,bindings=[{title,"BPG"}]}.
 body() ->
     wf:info(?MODULE, "body ~p", [0]),
     [ #span{ body = <<"404 - Not found">> }].

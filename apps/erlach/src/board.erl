@@ -17,7 +17,7 @@
 -endif.
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
-main()    -> #dtl{file="erlach",app=review,bindings=[{body,body()}, {theme,<<"">>}, {title,<<"Threads">>}]}.
+main()    -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"">>}, {title,<<"Threads">>}]}.
 
 check_access_to_board(Board) ->
 	case u:is_admin() of
@@ -94,7 +94,7 @@ body() ->
 									html:body(#panel{class= <<"center">>, body=[
 										#span{class= <<"content-title">>, body= <<"The board only for the elect">>},
 										#link{class= <<"button success">>, body= <<"Make request for access to this board">>,
-											url=wf:f("/thread?thread=~b",[Board#board.request_thread])}]})
+											url=wf:f("/thread?id=~b",[Board#board.request_thread])}]})
 							end
 					end;
 		        NotFound ->
@@ -111,7 +111,7 @@ html_thread(#thread{ id=Id, topic=Topic } = _Thread, #post{ message=Message, cre
             #panel{class= <<"thread-topic">>,body=[
 				#link{ class = <<"link">>,
 					body = case guard:html_escape(Topic) of <<>> -> wf:f("#~w", [Id]); T -> T end,
-					href = wf:f("/thread?thread=~p", [Id]) }
+					href = wf:f("/thread?id=~p", [Id]) }
             ]},
             #span{ class = <<"username">>, body = <<"anonymous">> },
             #span{ class = <<"message">>, body = guard:html_escape(Message) },
@@ -125,7 +125,7 @@ html_blog(HeadBlogList2) ->
 	#panel { class = <<"board-thread">>, body = [
 			%         #link{
 			% body = case guard:html_escape(Topic) of <<>> -> wf:f("#~w", [Id]); T -> T end,
-			% href = wf:f("/thread?thread=~p", [Id]) },
+			% href = wf:f("/thread?id=~p", [Id]) },
         #link{
 			body = guard:html_escape(<<"Вся лента блога ("/utf8, (wf:to_binary(length(HeadBlogList2)))/binary,") >>>>"/utf8>>),
 			href = wf:f("/board?board=~p&blog", [get(?BOARD_ID)]) }
@@ -133,11 +133,12 @@ html_blog(HeadBlogList2) ->
 
 
 
-event({thread, create, {request, {board, Bid}}=Type}) ->
+% event({thread, create, {request, {board, Bid}}=Type}) ->\
+event({thread, create, Type}) ->
 	u:restricted_call(fun() ->
 		case guard:to_integer(wf:qs(<<"board">>)) of
 			undefined -> skip;
-			Bid -> ?SESSION:set_param(thread, {thread, create, Bid, Type}), wf:redirect("/thread")
+			Bid -> ?SESSION:set_param(thread, {thread, create, Type}), wf:redirect("/thread")
 		end end, {feature, admin});
 event(utf_test) ->
 	wf:info(?MODULE, "UTF TEST: ~p", [wf:q(unc)]);

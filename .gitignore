@@ -1,0 +1,12 @@
+.DS_Store
+.eunit
+logs
+/ebin/*
+*~
+.#*
+*.beam
+/deps/*
+sys.config
+Mnesia.nonode@nohost
+sys.config
+apps/review/priv/static/attachments/*

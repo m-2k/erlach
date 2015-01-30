@@ -19,7 +19,7 @@
 -endif.
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
-main()    -> #dtl{file="erlach",app=review,bindings=[{body,body()}, {theme,<<"">>}, {title,<<"Thread">>}]}.
+main()    -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"">>}, {title,<<"Thread">>}]}.
 
 % check_access_to_thread(#board{}=Board,#thread{id=Tid,access=Access,type=Type,request_to=ReqTo}) ->
 % 	case u:is_admin() of
@@ -36,179 +36,98 @@ main()    -> #dtl{file="erlach",app=review,bindings=[{body,body()}, {theme,<<"">
 % 			end
 % 	end.
 
-check_access_to_post(_Thread, _Post) -> allow.
+% check_access_to_post(_Thread, _Post) -> allow.
 
 body() ->
-	% u:ensure_user(),
-	%     wf:info(?MODULE, "body ~p", [0]),
-	% wf:info(?MODULE, "user ~p ~p ~p", [u:get(), u:id(), u:is_admin()]),
-    case wf:qs(<<"thread">>) of
-        undefined -> % new thread creating request
-            case wf:qs(<<"board">>) of
-                undefined ->
-                    wf:redirect("/"), [];
-                B ->
-					IsAdmin = u:is_admin(),
-					case {IsAdmin,?SESSION:get_param(?MODULE)} of
-						{true, {new_thread_request,E,Eid}} -> % request creation
-							html:body(html:thread_body({E,Eid}));
-							
-						{_,_} ->	% normal creation
-		                    wf:info(?MODULE, "body NEW-T, Bid=~p", [B]),
-		                    Bid = wf:to_integer(B),
-		                    case kvs:get(board, Bid) of
-		                        {ok, Board} ->
-									case board:check_access_to_board(Board) of
-										allow -> html:body(html:thread_body());
-										_ -> wf:redirect("/"), []
-									end;
-		                        _NotExist -> wf:redirect("/"), []
-		                    end
-						% ErrorGet ->
-						% 	wf:warning(?MODULE, "Unknown request for creating thread: ~p (request,request_id,IsAdmin)",[ErrorGet]),
-						% 	wf:redirect("/"), []
-					end
-            end;
-        T -> % existing thread request
-            Tid = wf:to_integer(T),
-            case kvs:get(thread, Tid) of
-				{ok, #thread{feed_id = {board, Bid}, request_to=ReqTo}=Thread} ->
-					case kvs:get(board, Bid) of
-						{ok, Board} ->
-				            % wf:info(?MODULE, "body Bid=~p", [Bid]),
-							case check_access_to_thread(Board,Thread) of
-								allow -> html:body(html:thread_body(Tid,Bid));
-								_ -> wf:redirect("/"), [] end;
-						_ -> wf:redirect("/"), []
-					end;
-                _NotExist -> wf:redirect("/"), []
-			end
-    end,
-	
+    % % u:ensure_user(),
+    % %     wf:info(?MODULE, "body ~p", [0]),
+    % % wf:info(?MODULE, "user ~p ~p ~p", [u:get(), u:id(), u:is_admin()]),
+    %     case wf:qs(<<"thread">>) of
+    %         undefined -> % new thread creating request
+    %             case wf:qs(<<"board">>) of
+    %                 undefined ->
+    %                     wf:redirect("/"), [];
+    %                 B ->
+    %                 IsAdmin = u:is_admin(),
+    %                 case {IsAdmin,?SESSION:get_param(?MODULE)} of
+    %                     {true, {new_thread_request,E,Eid}} -> % request creation
+    %                         html:body(html:thread_body({E,Eid}));
+    %
+    %                     {_,_} ->    % normal creation
+    %                         wf:info(?MODULE, "body NEW-T, Bid=~p", [B]),
+    %                         Bid = wf:to_integer(B),
+    %                         case kvs:get(board, Bid) of
+    %                             {ok, Board} ->
+    %                                 case board:check_access_to_board(Board) of
+    %                                     allow -> html:body(html:thread_body());
+    %                                     _ -> wf:redirect("/"), []
+    %                                 end;
+    %                             _NotExist -> wf:redirect("/"), []
+    %                         end
+    %                     % ErrorGet ->
+    %                     %     wf:warning(?MODULE, "Unknown request for creating thread: ~p (request,request_id,IsAdmin)",[ErrorGet]),
+    %                     %     wf:redirect("/"), []
+    %                 end
+    %             end;
+    %         T -> % existing thread request
+    %             Tid = wf:to_integer(T),
+    %             case kvs:get(thread, Tid) of
+    %             {ok, #thread{feed_id = {board, Bid}, request_to=ReqTo}=Thread} ->
+    %                 case kvs:get(board, Bid) of
+    %                     {ok, Board} ->
+    %                         % wf:info(?MODULE, "body Bid=~p", [Bid]),
+    %                         case check_access_to_thread(Board,Thread) of
+    %                             allow -> html:body(html:thread_body(Tid,Bid));
+    %                             _ -> wf:redirect("/"), [] end;
+    %                     _ -> wf:redirect("/"), []
+    %                 end;
+    %                 _NotExist -> wf:redirect("/"), []
+    %         end
+    %     end,
+    %
 	
 	Init = try init_state() catch Type:Error -> {error, {Type,Error}} end,
 	case Init of
 		{ok, Data} -> html:body(html:thread_body(Data));
-		{error, _E} -> wf:redirect("/"), []
+		{error, E} ->
+            wf:info(?MODULE, "ERROR INIT: ~p",[E]),
+            wf:redirect("/"), []
 	end.
 
 init_state() ->
     case {guard:to_integer(wf:qs(<<"id">>)),?SESSION:get_param(?MODULE)} of
-		{Id, _} when Id =/= undefined -> % view thread
-			{ok,#thread{feed_id={board,Bid}}=Thread}=kvs:get(thread,Id),
-			{ok,Board}=kvs:get(board,Bid),
-			{ok, {view, {default, Thread}, Board}};
-		{undefined, {thread, create, {request, {board, Bid}}=Type}} -> % new thread (request)
-			{ok,Board}=kvs:get(board,Bid),
-			{ok, {create, Type, Board}};
-		{undefined, {thread, create, {default, Bid}=Type}} -> % new thread
-			{ok,Board}=kvs:get(board,Bid),
-			{ok, {create, Type, Board}};
+		{Tid, _} when Tid =/= undefined -> % view thread
+			check_access_to_thread(Tid,{thread, view, Tid});
+		{undefined, {thread, create, {request, {board, Bid}}}=Action} -> % new thread (request)
+			check_access_to_board(Bid,Action);
+		{undefined, {thread, create, {default, Bid}}=Action} -> % new thread
+			check_access_to_board(Bid,Action);
 		_ -> {error, bad_request}
 	end.
 
-check_access(Init) ->
-	case Init of
-		{ok, view, Board, Thread} ->
-			case check_access_to_thread(Board,Thread) of allow -> Init; _ -> 400 end;
-		{ok, create, Type, Board}
-		
+check_access_to_thread(Tid, Action) ->
+    User = u:get(),
+	{ok,#thread{feed_id={board,Bid}}=Thread}=kvs:get(thread,Tid),
+	{ok,Board}=kvs:get(board,Bid),
+    AccessMetaList = [access:meta(Board),access:meta(Thread)],
+    case access:discavering(User,AccessMetaList) of
+        {ok, Access} ->
+            wf:info(?MODULE, "Access OK: ~p",[Access]),
+            wf:wire(#transfer{state=Action}),
+            {ok, {Access, Board, Thread, Action}};
+        E -> E end.
 
-	% TODO: придумать администрирование пользователями
-	% INPUT: User, Item, Action,
-	% ACLs: {feature,admin}
-		{moderate, {board, 3, Type}}, Type :: #element.type
-		{read, {board,3, Type}} -> {allow,infinity,infinity}
-		{write, {board,3, Type}}
-		{write, {thread, 10, Type}}
-		{read, {global, board, Type}} -> {allow, Start, Expire} % Start for examply: ban on 1 day
-		{moderate, {global, thread, Type}} -> {allow, Start, Expire}
-		% {feature, moderator} % as global
-		% {feature, banned}
-	
-	% по умолчанию все запрещено кроме начальных установок
-	% накладываем на это то что разрешено, начиная с самого верхнего уровня
-	% ???
-	% PROFIT!
-
-% can restrict the rights for temporary users or others
-get_initial_access(Uid, {Action, {_Purpose, _Section, Object, Type}}=Feature) ->
-	% Read -> {allow, infinity},	% as {read, global}
-	% Write -> {allow, infinity},	% as {write, global}
-	% {undefined,Read,Write,none}.
-	Allow={allow,infinity,infinity},
-	Deny = none,
-	Access=u:check_access(Uid, Feature),
-	case Access of
-		Deny ->
-			case {Action,Object,Type} of
-				{read,thread,_} -> Allow;
-				{read,board,_} -> Allow;
-				{write,thread,default} -> Allow;
-				{write,thread,request} -> Allow;
-				{write,board,default} -> Allow;
-				_ -> Deny
-			end;
-		_ -> Access
-	end.
-
-% check_access_to_thread({Mode, Type, Board}) ->
-	{thread, read,   {default, Thread}, Board}
-	{thread, write,  {default, Bid}, Board}
-	{thread, write,  {request, {board, Bid}}, Board}
-	{thread, write,  {request, {thread, Tid}}, Board}
-	{thread, write,  {request, {group, Gid}}, Board}
-	{thread, write,  {blog, Bid}, Board}
-	{thread, read,   {blog, Thread}, Board}
-	{board,  write,  {default, Gid}, Group}
-	{post,   write,  {default, Tid}, Thread}
-	{post,   write,  {question, Tid}, Thread}
-	{board,  read,   {default, Board}, Group}
-	{post,   read,   {default, Post}, Thread}
-	{post,   delete, {default, Pid}, Thread}
-	
-	
-	
-check_access({Object, OAction, {OType, _Data}, Parent) ->
-	% User = u:get(),
-	% IsAdmin = u:is_admin(User),
-	% IsTemp = u:is_temp(User),
-	% Uid = u:id(User),
-	
-	Purpose = element(1,Parent),
-	Action = case OAction of delete -> moderate; _ -> OAction end,
-	
-	Section = element(2,Parent),
-	Type = OType,
-	
-	Feature = {Action,{Purpose,Section,Object,Type}},
-	% {Value,Start,Expire}=
-	get_initial_access(1,Feature).
-	
-		{ kvs_acl:check_access(Uid, {feature, admin}) == allow,
-		kvs_acl:check_access(Uid, {feature, reviewer}) == allow,
-		kvs_acl:check_access(Uid, {feature, developer}) == allow} end,
-		
-	case IsAdmin of
-		true -> allow;
-		_ ->
-			case {Mode, Type, Board} of
-				{view, {default, #thread{id=Tid}}, #board{access=private}} ->
-					case {board:check_access_to_board(Board),u:check_access({thread,Tid})} of
-						{allow,allow} -> allow;
-						_ -> none
-					end;
-				{create, }
-			case {Access,Type} of
-				{private,_} ->
-					case {board:check_access_to_board(Board),u:check_access({thread,Tid})} of
-						{allow,allow} -> allow;
-						_ -> none
-					end;
-				{_,request} when ReqTo =/= undefined -> case u:is_temp() of true -> none; _ -> allow end;
-				_ -> board:check_access_to_board(Board)
-			end
-	end.
+check_access_to_board(Bid, Action) ->
+    User = u:get(),
+	{ok,Board}=kvs:get(board,Bid),
+    AccessMetaList = [access:meta(Board)],
+    case access:discavering(User,AccessMetaList) of
+        {ok, Access} ->
+            wf:info(?MODULE, "Access OK: ~p",[Access]),
+            wf:wire(#transfer{state=Action}),
+            {ok, {Access, Board, undefined, Action}};
+        E -> E end.
+    
 	
 
 posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread) ->
@@ -331,30 +250,25 @@ html_post_attachment(#post{ id=Id } = _P) ->
     end.
 
 event(init) ->
-	wf:info(?MODULE, "Pid: ~p", [self()]),
-	erlang:put(?NEWEST_POSTS,[]),
-	% wf:info(?MODULE, "Bridge info: ~p", [proplists:get_value(<<"user-agent">>, element(17,?REQ),undefined)]),
-    %% also if get(?board_id) is initialized -> new_thread; else -> new post 
-	u:ensure_user(),
-    case wf:qs(<<"thread">>) of
-        undefined -> % new thread creating request
-            case wf:qs(<<"board">>) of
-                undefined -> wf:error(?MODULE, "Logical error: body/0 preventing this clause", []);
-                B -> put(?BOARD_ID, wf:to_integer(B))
-            end;
-        T -> % existing thread request
-            put(?THREAD_ID, wf:to_integer(T)),
-			wf:reg({thread, wf:to_integer(T)})
+    wf:info(?MODULE, "Pid: ~p", [self()]),
+    erlang:put(?NEWEST_POSTS,[]),
+    % wf:info(?MODULE, "Bridge info: ~p", [proplists:get_value(<<"user-agent">>, element(17,?REQ),undefined)]),
+        %% also if get(?board_id) is initialized -> new_thread; else -> new post
+    u:ensure_user(),
+    case erlang:get(state) of
+        {thread, view, Tid} ->
+            put(?THREAD_ID, guard:to_integer(Tid)),
+            wf:reg({thread, guard:to_integer(Tid)});
+        {thread, create, {default, Bid}} -> put(?BOARD_ID, wf:to_integer(Bid));
+        {thread, create, {request, {board=Element, ElementId}}} -> 
+            u:restricted_call(fun() ->
+                put(?STORED_REQUEST_TO, {Element,ElementId}),
+                wf:info(?MODULE,"Setup STORED_REQUEST_TO: ~p",[{new_thread_request,Element,ElementId}])
+                end,{feature,admin})
     end,
-    wf:info(?MODULE, " BOARD: ~p, THREAD: ~p, USER_ID: ~p", [get(?BOARD_ID), get(?THREAD_ID), u:id(u:get())]),
-	
-	u:restricted_call(fun() ->
-		case ?SESSION:get_param(?MODULE) of
-			{new_thread_request,E,Eid} ->
-				put(?STORED_REQUEST_TO, {E,Eid}),
-				wf:info(?MODULE,"Setup STORED_REQUEST_TO: ~p",[{new_thread_request,E,Eid}]);
-			_ -> ok
-		end end,{feature,admin});
+    wf:info(?MODULE, " BOARD: ~p, THREAD: ~p, USER_ID: ~p", [get(?BOARD_ID), get(?THREAD_ID), u:id(u:get())]);
+
+    
 event(send) -> event({send, post_message});
 
 
@@ -563,7 +477,7 @@ event({server,{converted, Data, {meta, PostID, Position, Name, Date, Description
 					wf:wire(wf:f("fileLoadFinished(~b);", [Position])),
                     {ok, Unique, Path};
                 {error, R} ->
-                    wf:error(?MODULE, "Error write file: ~p", [Path]),
+                    wf:error(?MODULE, "Error write file: ~p ~p", [R, Path]),
                     {error, R}
             end;
 		E -> E

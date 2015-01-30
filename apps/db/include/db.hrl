@@ -6,17 +6,17 @@
 -define(ELEMENT,
 	created,		% timestamp
 	published,		% timestamp
-	type = default,			% thread::default|blog|request, post::default|question
-	access,			% undefined (none)|all|registered|private (access check)|charge (payment)|promo (title & thumb image)
+	type = default,	% thread::default|blog|request, post::default|question
+	access = [] :: list(tuple()),
 	request_thread, % thread id
 	hidden,			% undefined|any(), user defined
 	deleted,		% undefined|any(), modefator defined
 	draft,
 	name,
-	view = [],
+	view = [] :: list(),
 	count,			% count of entry elements
 	temporary = true :: false|true,		% machine logic for pre-storing
-	tags = [],		% tag names
+	tags = [] :: list(),		% tag names
 	future = []).		% extends fields for future
 
 % -record(element,  {?ELEMENT}).
@@ -27,3 +27,9 @@
 % -record(container_event, {?ITERATOR(container_log), ?LOG_HEADER }).
 
 -endif.
+%
+%
+% #element.access :: [undefined|registered|{payment (Group), board (Level), write (Action), blog (Type)}]
+%
+% #access :: {{user, Uid}, {Gpoup, Level, Id}} = [ {Action,Type, infinity (Begins), infinity (Expire)} ]
+%

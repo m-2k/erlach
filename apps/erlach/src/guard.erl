@@ -81,7 +81,8 @@ shared_event(profile, {twitter,logintwitter}=E) ->
 shared_event(_, signin) ->
 	?SESSION:set_param(profile,signin),
 	wf:redirect("/profile");
-shared_event(_, logout) ->
+shared_event(M, logout) ->
+    wf:info(?MODULE, "Logot from: ~p", [M]),
 	u:logout(),
 	wf:redirect("/");
 shared_event(Module, Event) ->
