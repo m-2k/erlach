@@ -1,4 +1,4 @@
--module(unique).
+-module(utils).
 -compile(export_all).
 
 to_digit(N) when N < 10 -> $0 + N;

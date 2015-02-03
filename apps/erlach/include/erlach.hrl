@@ -17,11 +17,19 @@
 -define(AUTH, <<"auth">>).
 -define(USER, <<"user">>).
 -define(COOKIE_PATH, <<"/">>).
--define(SESSION_REDIRECT_TIME_LIMIT, 60). % seconds
+-define(SESSION_PARAMETERS_EXPIRATION_TIME, 60*60). % seconds
 
 % {mime, ext}
 -define(MIME_IMAGE_JPEG, {<<"image/jpeg">>, <<"jpg">>}).
--define(MIME_IMAGE_GIF, {<<"image/gif">>, <<"gif">>}).
--define(MIME_IMAGE_PNG, {<<"image/png">>, <<"png">>}).
--define(MIME_IMAGE_BPG, {<<"image/bpg">>, <<"bpg">>}).
+-define(MIME_IMAGE_GIF,  {<<"image/gif">>,  <<"gif">>}).
+-define(MIME_IMAGE_PNG,  {<<"image/png">>,  <<"png">>}).
+-define(MIME_IMAGE_BPG,  {<<"image/bpg">>,  <<"bpg">>}).
 
+-define(UPLOAD_MIN_SIZE, 100).
+-define(UPLOAD_MAX_SIZE, 1048576). % 1MB
+% -define(UPLOAD_MAX_SIZE, 102400). % 100KB
+
+-define(SITE_NAME, <<"Erlach">>).
+-define(TITLE_DELIMETER, <<" – "/utf8>>).
+
+-define(ACTION_API, {Access, Board, Thread, {thread, Action, Data}}).

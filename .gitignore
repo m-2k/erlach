@@ -1,12 +1,10 @@
 .DS_Store
 .eunit
 logs
-/ebin/*
+/ebin/
 *~
 .#*
 *.beam
-/deps/*
-sys.config
-Mnesia.nonode@nohost
-sys.config
-apps/review/priv/static/attachments/*
+/deps/
+apps/erlach/priv/static/attachments/
+Mnesia.nonode*

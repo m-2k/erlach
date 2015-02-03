@@ -6,7 +6,7 @@ var thumb_iterator = 0;
 $binary.do = function(e) { debugger; console.log("BINARY: " + e) };
 $bert.do = function(e) { console.log("BERT: " + e) };
 
-var ipt = document.getElementById('message_input_form');
+var ipt = document.getElementById('drag-input-form');
 if(ipt) {
     var resetTimer;
     var className = 'over';
@@ -39,6 +39,26 @@ function fileLoadFinished(pos) {
 	thumbnails[pos].style.opacity = 1.0;
 	thumbnails[pos].is_loaded = true;
 };
+function fileLoadFailed(pos) {
+    console.log("Upload error" + pos);
+    thumbnails[pos].style.opacity = 0.2;
+    // thumbnails[pos].style.webkitFilter = "blur(1px)";
+    // thumbnails[pos].parentElement.style.borderColor = "rgba(255,0,0,0.7)";
+};
+
+function roundedCanvas(ctx,x,y,width,height,radius){
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
 
 /// http://stackoverflow.com/questions/26288376/alternative-to-base64-when-loading-data-from-file-input
 function handleFileSelect(evt) {
@@ -65,6 +85,8 @@ function handleFileSelect(evt) {
             // newimg_container.style.backgroundImage = "url(" + this.image.src + ")";
             var w = h * (this.image.width / this.image.height);
             newimg_container.style.width = Math.floor(w);
+            
+            var cw, ch, crop;
             if( w < h ) {
                 cw = h; ch = h; crop = (this.image.height - this.image.width) / 2;
             } else { cw = w; ch = h; crop = 0; }
@@ -76,15 +98,24 @@ function handleFileSelect(evt) {
             var ratio = (devicePixelRatio / backingStoreRatio) * 2;
             // debugger
             /// upscale the canvas if the two ratios don't match
-            if (devicePixelRatio !== backingStoreRatio) {
+            // if (devicePixelRatio !== backingStoreRatio) {
                 canvas.width = cw * ratio;
                 canvas.height = ch * ratio;
                 canvas.style.width = cw + 'px';
                 canvas.style.height = ch + 'px';
                 ctx.scale(ratio, ratio);
                 console.log("Using ratio: " + ratio + " (" + canvas.width + "x" + canvas.height + ")");
-            }
+            // }
+            
+            ctx.save();
+            // ctx.translate(0,0);
+            // ctx.scale(2,2);
+            // ctx.clearRect(0,0,cw,ch);
+            roundedCanvas(ctx,0,0,cw,ch,2);
+            ctx.clip();
+            // ctx.scale(2,2);
             ctx.drawImage(this.image, 0, crop, this.image.width, this.image.height-crop-crop , 0, 0, cw, ch);
+            ctx.restore();
             
             /// Removing attachment
             /// c-ontainer, p-osition, n-ame
@@ -92,7 +123,7 @@ function handleFileSelect(evt) {
                 
                 this.container.parentNode.removeChild(this.container);
                 window.URL.revokeObjectURL(this.blob_url);
-                ws.send(enc(tuple(atom('bin'),tuple(atom('remove_attachment'), this.position, this.filename))));
+                ws.send(enc(tuple(atom('bin'),tuple(atom('attachment'), atom('remove'), this.position))));
                 console.log("Sended event to remove attach: " + this.position + " :: " + this.filename);
                 
             }).bind({blob_url: this.image.src,
@@ -113,7 +144,7 @@ function handleFileSelect(evt) {
                 // SEND TO SERVER
 				console.log("Sending attachment");
                 ws.send(enc(tuple(atom('bin'),
-                    tuple(atom('attachment'),
+                    tuple(atom('attachment'),atom('upload'),
                     this.p, this.n, this.t,
                     this.s, this.d, bin(this.r.result)))));
             }).bind({r: reader_blob,
@@ -153,9 +184,9 @@ Array.prototype.forEach.call(ta_elements, function(el, i){
 /* TEXTAREA SHADOW PROCESSES START */
 
 var STORE_TIMEOUT = 4000;
-var textarea = document.getElementById('textarea');
+var textarea = document.getElementById('message');
 if(textarea) {
-    var textarea_topic = document.getElementById('textarea_topic');
+    var textarea_topic = document.getElementById('topic');
     // var send_message = document.getElementById('send_message');
     var storeTimer;
     var onchange = function() {
@@ -167,12 +198,15 @@ if(textarea) {
         window.clearTimeout(storeTimer);
         if(textarea.value !== "") {
             storeTimer = window.setTimeout(function(){
-                console.log("Storing text: " + textarea.value);
-                if (textarea_topic) {
-                    ws.send(enc(tuple(atom('client'),tuple(atom('store_thread'), textarea_topic.value, textarea.value))));
-                } else {
-                    ws.send(enc(tuple(atom('client'),tuple(atom('store_post'), textarea.value))));
-                }
+                console.log("Auto storing");
+                // if (textarea_topic) {
+                //     ws.send(enc(tuple(atom('client'),tuple(atom('store_thread'), textarea_topic.value, textarea.value))));
+                // } else {
+                //     ws.send(enc(tuple(atom('client'),tuple(atom('store_post'), textarea.value))));
+                // }
+                // var store_button=qi('store');
+                // if(store_button){ store_button.click(); };
+                ws.send(enc(tuple(atom('client'),atom('auto_store'))));
             },STORE_TIMEOUT);
         }
     
@@ -182,10 +216,13 @@ if(textarea) {
     textarea.addEventListener('keyup', onchange);
 };
 
-function sending_finished() {
+function publish_finished() {
 	// debugger;
     window.clearTimeout(storeTimer);
     textarea.value="";
+    
+    thumbnails = {};
+    thumb_iterator = 0;
     
     thumbnail_list = document.getElementById('thumbnail-list')
     while (thumbnail_list.firstChild) {

@@ -1,6 +1,6 @@
 -module(access).
 % -compile(export_all).
--export([t/0, meta/1, discavering/2]).
+-export([t/0, meta/1, discavering/2, lookup/2, is_allow/3, define/2]).
 
 -include_lib("db/include/board.hrl").
 -include_lib("db/include/thread.hrl").
@@ -10,13 +10,20 @@
 % -define(SESSION, (wf:config(n2o,session,erlach_session))).
 % -endif.
 
--define(DEFAULT_ACCESS_RULES, [{read,default},{write,blog},{read,blog}]).
+-define(DEFAULT_ACCESS_RULES, [{write,post},{write,blog},{write,thread}]).
 
 % Action: read|write|moderate
 
 % Type: any|blog|message|etc...
 check_time({Begins,Expire}) -> allow;
 check_time(none) -> none.
+
+% define(Uid,#group{id=Gid}) -> define(Uid,private,group,Gid,infinity,infinity);
+define(Uid,#board{id=Bid}) -> define(Uid,private,board,Bid,infinity,infinity);
+define(Uid,#thread{id=Tid}) -> define(Uid,private,thread,Tid,infinity,infinity).
+    
+define(Uid,Group,Level,Lid,Begins,Expire) ->
+    kvs_acl:define_access({user,Uid}, {Group,Level,Lid}, {Begins,Expire}).
  
 acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
 acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
@@ -106,3 +113,11 @@ access_merge({Action,Type}=AT, List, Operation) ->
                 _ -> List
             end
     end.
+
+
+lookup(Type,Access) -> lists:keyfind(Type,2,Access).
+is_allow(Type,Action,Access) ->
+    case lookup(Type,Access) of
+        {Value,Type} -> case compare(Action,Value) of C when C < 0 -> false; _ -> true end;
+        _ -> false end.
+% case_lookup(Fun, Type, Access) -> case lookup(Type, Access) of {Value, Type} -> Fun(); _ -> [] end.

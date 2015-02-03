@@ -16,7 +16,7 @@ init(State, Ctx) ->
         SessionId ->
             case lookup_ets({SessionId,?AUTH}) of
                 undefined ->
-					{new, new_cookie_value()};
+                    {new, new_cookie_value()};
                 {{SessionId, ?AUTH},#cookie{expire=Expire}} = C ->
                     case expired(Expire) of
                         true -> {new, new_cookie_value()};
@@ -25,24 +25,24 @@ init(State, Ctx) ->
                 _ ->
                     wf:error(?MODULE, "Cookie Error", []),
                     {new, new_cookie_value()}
-			end
-	end,
+            end
+    end,
     {{Id, Key}, Value} = case Request of
         {new, SID} ->
             {Now_GMT, Expire_GMT} = expire(),
             Cookie = {{SID,?AUTH},#cookie{status=new,path=?COOKIE_PATH,ttl=ttl(),issued=Now_GMT,expire=Expire_GMT}},
-			wf:info(?MODULE, "New cookie: ~p", [Cookie]),
-			% User = #user3{id={?T,SID},created=Now_GMT},
-			% wf:info(?MODULE, "New user: ~p", [User]),
-			ets:insert(cookies,Cookie),
-			% ets:insert(cookies,{{SID,?USER},User}),
+            wf:info(?MODULE, "New cookie: ~p", [Cookie]),
+            % User = #user3{id={?T,SID},created=Now_GMT},
+            % wf:info(?MODULE, "New user: ~p", [User]),
+            ets:insert(cookies,Cookie),
+            % ets:insert(cookies,{{SID,?USER},User}),
             Cookie;
         {exist, {{SID, _K}, #cookie{issued=Issued}} = _Cookie} ->
             {_Now_GMT_2, Expire_GMT_2} = expire(),
             Cookie2 = {{SID,?AUTH},#cookie{status=actual,path=?COOKIE_PATH,ttl=ttl(),issued=Issued,expire=Expire_GMT_2}},
-			wf:info(?MODULE, "Cookie exist: ~p", [Cookie2]),
-			% {{SID, ?USER}, User} = lookup_ets({SID,?USER}),
-			% wf:info(?MODULE, "User exist: ~p", [User]),
+            wf:info(?MODULE, "Cookie exist: ~p", [Cookie2]),
+            % {{SID, ?USER}, User} = lookup_ets({SID,?USER}),
+            % wf:info(?MODULE, "User exist: ~p", [User]),
             ets:insert(cookies,Cookie2),
             Cookie2
     end,
@@ -56,7 +56,7 @@ finish(State, Ctx) ->
               wf:cookie_req(session_cookie_name(),Session,Path,TTL,Ctx#cx.req);
          _ -> Ctx#cx.req end,
     {ok, State, Ctx#cx{req=NewReq}}.
-	
+    
 ttl() -> 60*60*24. % 1 day
 now_time() ->
     calendar:local_time().
@@ -89,65 +89,29 @@ clear(Session) ->
 session_id() -> {{Id, _Key}, _Value} = ?CTX#cx.session, Id. % Speed fix:  -20 ms
 % session_id() -> wf:cookie_req(session_cookie_name(),?REQ).
 
-	
+    
 new_cookie_value() -> base64:encode(erlang:md5(term_to_binary({now(), make_ref()}))).
 new_state() -> #state{unique=new_cookie_value()}.
 session_cookie_name() -> wf:config(n2o, session_cookie_name, <<"n2o-sid">>).
 set_value(Key, Value) -> ets:insert(cookies,{{session_id(),Key},Value}), Value.
 get_value(Key, DefaultValue) ->
-	
+    
     Res = case lookup_ets({session_id(),Key}) of
                undefined -> DefaultValue;
                {_,Value} -> Value end,
     wf:info(?MODULE,"Session Lookup Key ~p Value ~p",[Key,Res]),
     Res.
 
-
-
-% temp_key() -> crypto:rand_bytes(4).
-% temp_key() -> unique:random().
-% temp_key() -> {_,_,C} = now(), list_to_binary(wf:f("~.36b", [C])).
-% temp_key([Num]) -> temp_key(Num);
-% temp_key([Num|T]) -> temp_key(Num) ++ temp_key(T);
-% temp_key(Num) -> case Num of _ when Num > 1295 -> "~.36B"; _ -> "~.36b" end.
-% temp_key() ->
-% 	<<A1,A2,A3,A4,A5,B1,B2,B3,B4,B5,C1,C2,C3,C4,C5,D1,D2,D3,D4,D5>> = crypto:rand_bytes(20),
-% 	{A,B,C,D} = {A1+A2+A3+A4+A5,B1+B2+B3+B4+B5,C1+C2+C3+C4+C5,D1+D2+D3+D4+D5},
-% 	S = temp_key([A,B,C,D]),
-% 	wf:to_binary(wf:f(S, [A,B,C,D])).
-
-% temp_key(<<>>,S,N) -> {S,N};
-% temp_key(<<A,B,C,D,E,F,G,H,I,K,Tail/binary>>,S,N) ->
-% 	Num = A+B+C+D+E+F+G+H+I+K,
-% 	{Sx, Nx} = case Num of
-% 		_ when Num < 36 -> {"0~.36B",Num};
-% 		_ when Num > 1310 -> {"~.36B",Num-1275};
-% 		_ when Num > 1275 -> {"0~.36B",Num-1275};
-% 		_ -> {"~.36b",Num}
-% 	end,
-% 	temp_key(Tail,Sx ++ S, [Nx|N]).
-%
-% temp_key(Length) when is_number(Length)->
-% 	{S,N} = temp_key(crypto:rand_bytes(Length*10),[],[]),
-% 	wf:to_binary(wf:f(S,N)).
-% temp_key() -> temp_key(2).
-% set_param(Value) -> Key = temp_key(), set_value(Key, Value), Key.
-% get_param(Key) -> get_value(Key, undefined).
-% erase_param(Key) ->
-% 	Value = get_value(Key, undefined),
-% 	ets:delete(cookies, {session_id(),Key}),
-% 	Value.
-
 set_param(DestanationModule,Value) ->
-	{Now_GMT, Expire_GMT} = expire(?SESSION_REDIRECT_TIME_LIMIT),
-	V = {Value, Expire_GMT},
-	set_value(list_to_binary(atom_to_list(DestanationModule)), V), V.
+    {Now_GMT, Expire_GMT} = expire(?SESSION_PARAMETERS_EXPIRATION_TIME),
+    V = {Value, Expire_GMT},
+    set_value(list_to_binary(atom_to_list(DestanationModule)), V), V.
 get_param(Module) ->
-	case get_value(list_to_binary(atom_to_list(Module)), undefined) of
-		undefined -> undefined;
-		{Value, Expire_GMT} -> case expired(Expire_GMT) of false -> Value; _ -> undefined end
-	end.
+    case get_value(list_to_binary(atom_to_list(Module)), undefined) of
+        undefined -> undefined;
+        {Value, Expire_GMT} -> case expired(Expire_GMT) of false -> Value; _ -> undefined end
+    end.
 erase_param(Module) ->
-	Value = get_param(Module),
-	ets:delete(cookies, {session_id(),list_to_binary(atom_to_list(Module))}),
-	Value.
+    Value = get_param(Module),
+    ets:delete(cookies, {session_id(),list_to_binary(atom_to_list(Module))}),
+    Value.

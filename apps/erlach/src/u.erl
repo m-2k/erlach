@@ -64,7 +64,7 @@ join() ->
         Wrong -> {error, {wrong_user_type, Wrong}}
     end.
 
-new_password() -> list_to_binary(unique:to_hex(crypto:rand_bytes(8))).
+new_password() -> list_to_binary(utils:to_hex(crypto:rand_bytes(8))).
 
 check_access(Feature) -> check_access(u:id(), Feature).
 check_access(U, Feature) -> % User or Uid
