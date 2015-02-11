@@ -37,6 +37,7 @@ init(State, Ctx) ->
 
 route(undefined)         -> root;
 route(<<"privacy">>)     -> privacy;
+route(<<"donate">>)      -> donate;
 route(<<"profile">>)     -> profile;
 route(<<"board">>)       -> board;
 route(<<"thread">>)      -> thread;

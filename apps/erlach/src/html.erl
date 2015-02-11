@@ -327,9 +327,10 @@ board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) -
         _Empty -> []
     end.
 
-html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,markup=Markup}=Post) ->
+html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,head=IsHead,markup=Markup}=Post) ->
     
-    Class = case ThreadType of blog -> <<"board-blog">>; _ -> <<"board-thread">> end,
+    IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
+    Class = case IsBlog of true -> <<"board-blog">>; _ -> <<"board-thread">> end,
     Text = case Markup of
         markdown -> markdown:conv_utf8(Message);
         _ -> guard:html_escape(Message)
@@ -341,7 +342,7 @@ html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Mess
                     body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
                     href=qs:ml({thread,Id})}
             ]},
-            #span{class= <<"username">>,body= <<"anonymous">>},
+            case IsBlog of true -> []; _ -> #span{class= <<"username">>,body= <<"anonymous">>} end,
             #span{class= <<"message">>,body=Text},
             #panel{class= <<"post-attachment">>,body=html:post_attachment(Post)}
         ]}.

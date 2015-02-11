@@ -546,15 +546,26 @@ select.name-selector {
 /*    border-bottom: 10px solid rgba(200,200,200,0.5);*/
 }
 
+.board-blog .thread-topic .link {
+    font-size: 30px;
+}
+
 .related-links {
 	padding: 16px 4px 16px 4px;
 }
 
-.board-list {
+.board-list, .board-list-right {
     padding: 40px 10px 10px 10px;
+    width:auto;
+    float:left;
 }
 .board-list .board {
 /*    margin: 1px 0px 1px 0px;*/
+}
+
+.board-list-right {
+    float:right;
+    text-align:right;
 }
 
 #username-manage {
@@ -746,6 +757,9 @@ body.glassy.restrict, .glassy.restrict #header::before, .glassy.restrict #footer
 body.glassy.privacy, .glassy.privacy #header::before, .glassy.privacy #footer::before {
 	background: url(/static/privacy-5.jpg) no-repeat center center fixed; }
 .glassy.privacy .content-title, .glassy.privacy .message{ color: #eee; }
+
+body.glassy.donate, .glassy.donate #header::before, .glassy.donate #footer::before {
+	background: url(/static/donate.jpg) no-repeat center center fixed; }
 
 .glassy #header::before, .glassy #footer::before {
 	overflow: hidden;

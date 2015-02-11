@@ -6,6 +6,7 @@
 -define(DB_ELEMENT(Container),
     ?ITERATOR(Container),
 	created,		% timestamp
+    temporary = true :: false|true,		% machine logic for pre-storing
 	published,		% timestamp
 	type,	% thread::default|blog|request, post::default|question
 	access = [] :: list(tuple()),
@@ -18,7 +19,6 @@
     name,
 	view = [] :: list(),
 	count,			% count of entry elements
-	temporary = true :: false|true,		% machine logic for pre-storing
     links = [],
 	tags = [] :: list(),		% tag names
 	future = []).		% extends fields for future

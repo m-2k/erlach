@@ -28,6 +28,7 @@ log_modules() ->
         avz,
         wf_convert,
         image,
+        utils,
         u,
         html,
         access,

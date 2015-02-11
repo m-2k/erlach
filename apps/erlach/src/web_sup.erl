@@ -24,7 +24,7 @@ init([]) ->
         X -> io:format("Unknown Error: ~p\r\n",[X]), halt(abort,[]) end,
 
     kvs:join(),
-    case kvs:get(board,1) of {ok, _} -> ok; _ -> utils:init_db() end,
+    % case kvs:get(board,1) of {ok, _} -> ok; _ -> utils:init_db() end,
 	
 	% start_child(image),
 	% supervisor:start_child(web_sup, {image, {image, start_link, []}, transient,1000,worker,[image]}),
