@@ -154,21 +154,6 @@ clone(Id) ->
     U2 = setelement(19,U1,wf:to_binary(wf:temp_id())),
     U3 = setelement(30,U2,[{twitter,wf:to_binary(wf:temp_id())}|undefined]),
     kvs:put(U3).
-    
-names() -> names(u:get()).
-names(User) ->
-    % kvs:entries(kvs:get(feed, {user,u:id(User)}), name, undefined).
-    case kvs:get(feed, {user, u:id(User)}) of
-        {ok, Uf} -> kvs:traversal(name, Uf#feed.top, Uf#feed.entries_count, #iterator.prev);
-        _ -> []
-    end.
-put_name() ->
-    case u:is_temp() of
-        false ->
-            % storing
-            {ok, result};
-        _ -> {error, prevent_for_temp_user}
-    end.
 
 % {read, {board,3, thread,Type}} -> {allow,infinity,infinity}
 % u:ca({board,write,{default,7},{thread,4}}).-> {allow,infinity,infinity}
@@ -210,117 +195,118 @@ ca({Object, OAction, {OType, _Data}, Parent}) ->
     Feature = {Action,{Purpose,Section,Object,Type}},
     % {Value,Start,Expire}=
     get_initial_access(1,Feature).
-    
-% модель защиты это всегда эффективная функция проверки check к двум множествам (списком доступа объекта и списком возможностей пользователя)
 
+names() -> names(u:get()).
+names(User) ->
+    case kvs:get(feed, {name, u:id(User)}) of
+        {ok, Fn} ->
+            NameList = kvs:traversal(name, Fn#feed.top, Fn#feed.entries_count, #iterator.prev);
+        _ -> []
+    end.
+put_name() ->
+    case u:is_temp() of
+        false ->
+            % storing
+            {ok, result};
+        _ -> {error, prevent_for_temp_user}
+    end.
 
-
-
-
-
-
-
-
-
-
-
-
-% Action: read|write|moderate
-
-% Type: any|blog|message|etc...
-check_time({Begins,Expire}) -> allow;
-check_time(none) -> none.
- 
-acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
-acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
-acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
-acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
-acl(_) -> none.
-
-% access(group,7) -> [];
-access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
-% access(board,1) -> [];
-access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
-% access(thread,1) -> [{private, read, blog}];
-% access(thread,2) -> [{private, read, blog}];
-% access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
-access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
-access(_,_) -> [].
- 
-weight(read) -> 0;
-weight(write) -> 1;
-weight(moderate) -> 2.
- 
-% is_rising(Action1,Action2) -> weight(Action1) < weight(Action2).
-compare(Action,Action) -> 0;
-compare(Action1,Action2) -> weight(Action2) - weight(Action1).
-u_is_temp() -> false.
+% % Action: read|write|moderate
+%
+% % Type: any|blog|message|etc...
+% check_time({Begins,Expire}) -> allow;
+% check_time(none) -> none.
+%
+% acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
+% acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
+% acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
+% acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
+% acl(_) -> none.
+%
+% % access(group,7) -> [];
+% access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
+% % access(board,1) -> [];
+% access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
+% % access(thread,1) -> [{private, read, blog}];
+% % access(thread,2) -> [{private, read, blog}];
+% % access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
+% access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
+% access(_,_) -> [].
+%
+% weight(read) -> 0;
+% weight(write) -> 1;
+% weight(moderate) -> 2.
+%
+% % is_rising(Action1,Action2) -> weight(Action1) < weight(Action2).
+% compare(Action,Action) -> 0;
+% compare(Action1,Action2) -> weight(Action2) - weight(Action1).
+% u_is_temp() -> false.
 
 % make_access_chain(Uid,thread) ->
 %     check_access(Uid,gpoup,access(group,8)) ++
 %     check_access(Uid,board,access(board,2)) ++
 %     check_access(Uid,thread,access(thread,4)).
- 
-dive_access([], Acc, _Uid) -> Acc;
-% access([none|_Tail], _Acc) -> none;
-% access([skip,|Tail], Acc) -> access(Tail, Acc);
-dive_access(_Access, [], _Uid) -> none;
-dive_access([{Level,Lid,Access}=AccessMeta|Tail], Acc, Uid) ->
-    % wf:info(?MODULE, "dive_access: Acc: ~p",[Acc]),
-    case check_access(Uid, Level, Lid, Access) of
-        none -> none;
-        skip -> dive_access(Tail, Acc, Uid);
-        Checked -> % find first level and return
-            % wf:info(?MODULE, "dive_access: Checked: ~p",[Checked]),
-            NewAccess=lists:foldl(fun({Action,Type}=AT, AccAnd) ->
-                % wf:info(?MODULE, "dive_access: Acc: ~p, AT: ~p, AccAnd: ~p",[Acc,AT,AccAnd]),
-                case access_merge(AT, Acc, logical_and) of nothing -> AccAnd; N -> [N|AccAnd] end
-            end,[],Checked),
-            % wf:info(?MODULE, "dive_access: NewAccess: ~p",[NewAccess]),
-            dive_access(Tail, NewAccess, Uid)
-    end.
+%
+% dive_access([], Acc, _Uid) -> Acc;
+% % access([none|_Tail], _Acc) -> none;
+% % access([skip,|Tail], Acc) -> access(Tail, Acc);
+% dive_access(_Access, [], _Uid) -> none;
+% dive_access([{Level,Lid,Access}=AccessMeta|Tail], Acc, Uid) ->
+%     % wf:info(?MODULE, "dive_access: Acc: ~p",[Acc]),
+%     case check_access(Uid, Level, Lid, Access) of
+%         none -> none;
+%         skip -> dive_access(Tail, Acc, Uid);
+%         Checked -> % find first level and return
+%             % wf:info(?MODULE, "dive_access: Checked: ~p",[Checked]),
+%             NewAccess=lists:foldl(fun({Action,Type}=AT, AccAnd) ->
+%                 % wf:info(?MODULE, "dive_access: Acc: ~p, AT: ~p, AccAnd: ~p",[Acc,AT,AccAnd]),
+%                 case access_merge(AT, Acc, logical_and) of nothing -> AccAnd; N -> [N|AccAnd] end
+%             end,[],Checked),
+%             % wf:info(?MODULE, "dive_access: NewAccess: ~p",[NewAccess]),
+%             dive_access(Tail, NewAccess, Uid)
+%     end.
 
-access_meta(Level,Lid) -> {Level,Lid,access(Level,Lid)}.
- 
-discavering_access() ->
-    Uid=2,
-    Default = [{read, default}, {write, blog},{read, blog}],
-    AccessMetaList = [access_meta(group,8), access_meta(board,2), access_meta(thread,4)],
-    case dive_access(AccessMetaList, Default, Uid) of
-        none -> none; %[{write,default},{write,message}]; % default access
-        Value -> Value
-    end.
- 
-% none, skip or [{Action,Type}, ...]
-check_access(_Uid, _Level, _Lid, []) -> skip;
-check_access(Uid, Level, Lid, Access) ->
-    A = lists:foldl(fun(E, Acc) ->
-            AT = case E of
-                {anonymous,Action,Type} -> case u_is_temp() of true -> {Action,Type}; _ -> skip end;
-                {Group,Action,Type} ->
-                    Acl = acl({{user,Uid},{Group,Level,Lid}}),
-                    case check_time(Acl) of
-                        allow -> {Action,Type};
-                        _ -> skip
-                    end
-            end,
-            % wf:info(?MODULE,"E: ~p Acc: ~p AT: ~p / To: ~p", [E,Acc,AT, {Level,Lid}]),
-            access_merge(AT,Acc,logical_or)
-        end,[],Access),
-    % wf:info(?MODULE,"check_access: ~p", [A]),
-    case A of [] -> none; _ -> A end.
- 
-access_merge(skip, List, _Operation) -> List;
-access_merge({Action,Type}=AT, List, Operation) ->
-    case lists:keyfind(Type,2,List) of
-        false ->                % new
-             case Operation of logical_or -> [AT|List]; logical_and -> nothing end;
-        % {Action,Type} -> List;  % duplicate
-        {OldA,Type} ->          % comparsion
-            case {Operation,compare(OldA,Action)} of
-                {logical_or, C} when C > 0 -> lists:keyreplace(Type,2,List,AT);
-                {logical_and, C} when C < 0 -> {Action,Type};
-                {logical_and, C} -> {OldA,Type};
-                _ -> List
-            end
-    end.
+% access_meta(Level,Lid) -> {Level,Lid,access(Level,Lid)}.
+%
+% discavering_access() ->
+%     Uid=2,
+%     Default = [{read, default}, {write, blog},{read, blog}],
+%     AccessMetaList = [access_meta(group,8), access_meta(board,2), access_meta(thread,4)],
+%     case dive_access(AccessMetaList, Default, Uid) of
+%         none -> none; %[{write,default},{write,message}]; % default access
+%         Value -> Value
+%     end.
+%
+% % none, skip or [{Action,Type}, ...]
+% check_access(_Uid, _Level, _Lid, []) -> skip;
+% check_access(Uid, Level, Lid, Access) ->
+%     A = lists:foldl(fun(E, Acc) ->
+%             AT = case E of
+%                 {anonymous,Action,Type} -> case u_is_temp() of true -> {Action,Type}; _ -> skip end;
+%                 {Group,Action,Type} ->
+%                     Acl = acl({{user,Uid},{Group,Level,Lid}}),
+%                     case check_time(Acl) of
+%                         allow -> {Action,Type};
+%                         _ -> skip
+%                     end
+%             end,
+%             % wf:info(?MODULE,"E: ~p Acc: ~p AT: ~p / To: ~p", [E,Acc,AT, {Level,Lid}]),
+%             access_merge(AT,Acc,logical_or)
+%         end,[],Access),
+%     % wf:info(?MODULE,"check_access: ~p", [A]),
+%     case A of [] -> none; _ -> A end.
+%
+% access_merge(skip, List, _Operation) -> List;
+% access_merge({Action,Type}=AT, List, Operation) ->
+%     case lists:keyfind(Type,2,List) of
+%         false ->                % new
+%              case Operation of logical_or -> [AT|List]; logical_and -> nothing end;
+%         % {Action,Type} -> List;  % duplicate
+%         {OldA,Type} ->          % comparsion
+%             case {Operation,compare(OldA,Action)} of
+%                 {logical_or, C} when C > 0 -> lists:keyreplace(Type,2,List,AT);
+%                 {logical_and, C} when C < 0 -> {Action,Type};
+%                 {logical_and, C} -> {OldA,Type};
+%                 _ -> List
+%             end
+%     end.

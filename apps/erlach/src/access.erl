@@ -1,6 +1,8 @@
 -module(access).
 % -compile(export_all).
--export([t/0, meta/1, discavering/2, lookup/2, is_allow/3, define/2]).
+-export([meta/1, discavering/2, lookup/2, is_allow/3, define/2, define/6, restrict/2, acl/1]).
+
+% Модель защиты – это всегда эффективная функция проверки check к двум множествам: списку доступа объекта и списку возможностей пользователя
 
 -include_lib("db/include/board.hrl").
 -include_lib("db/include/thread.hrl").
@@ -10,7 +12,8 @@
 % -define(SESSION, (wf:config(n2o,session,erlach_session))).
 % -endif.
 
--define(DEFAULT_ACCESS_RULES, [{write,post},{write,blog},{write,thread}]).
+-define(DEFAULT_ACCESS_RULES, [{write,post},{write,blog},{write,thread},{write,message},{read,request}]).
+-define(FULL_ACCESS_RULES, [{moderate,post},{moderate,blog},{moderate,thread},{moderate,message},{moderate,request}]).
 
 % Action: read|write|moderate
 
@@ -21,62 +24,77 @@ check_time(none) -> none.
 % define(Uid,#group{id=Gid}) -> define(Uid,private,group,Gid,infinity,infinity);
 define(Uid,#board{id=Bid}) -> define(Uid,private,board,Bid,infinity,infinity);
 define(Uid,#thread{id=Tid}) -> define(Uid,private,thread,Tid,infinity,infinity).
-    
+
+% access:define(1,private,thread,10,infinity,infinity).
 define(Uid,Group,Level,Lid,Begins,Expire) ->
     kvs_acl:define_access({user,Uid}, {Group,Level,Lid}, {Begins,Expire}).
- 
-acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
-acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
-acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
-acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
-acl(_) -> none.
+    
+restrict(Table,Id) ->
+    {ok, E} = kvs:get(Table,Id),
+    E2 = case E of
+        #thread{}=T -> T#thread{access=[{anonymous, read, blog},{private, write, blog}]};
+        #board{}=B -> B#board{access=[{anonymous, read, blog},{private, write, blog}]}
+    end,
+    kvs:put(E2).
 
-% access(group,7) -> [];
-access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
-% access(board,1) -> [];
-access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
-% access(thread,1) -> [{private, read, blog}];
-% access(thread,2) -> [{private, read, blog}];
-% access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
-access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
-access(_,_) -> [].
- 
-weight(read) -> 0;
-weight(write) -> 1;
-weight(moderate) -> 2.
+acl({{user,1}, {private,board,2}}) -> {infinity,infinity};
+acl({{user,1}, {private,board,6}}) -> {infinity,infinity};
+acl({{user,1}, {private,thread,10}}) -> {infinity,infinity};
+
+% acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
+% acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
+% acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
+% acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
+% acl(_) -> none.
+acl(Key) -> kvs_acl:check([ Key ]).
+
+% % access(group,7) -> [];
+% access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
+% % access(board,1) -> [];
+% access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
+% % access(thread,1) -> [{private, read, blog}];
+% % access(thread,2) -> [{private, read, blog}];
+% % access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
+% access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
+% access(_,_) -> [].
+
+weight(nothing) -> 0;
+weight(read) -> 1;
+weight(write) -> 2;
+weight(moderate) -> 3.
  
 % is_rising(Action1,Action2) -> weight(Action1) < weight(Action2).
 compare(Action,Action) -> 0;
 compare(Action1,Action2) -> weight(Action2) - weight(Action1).
 % u_is_temp() -> false.
 
-meta(Level,Lid) -> {Level,Lid,access(Level,Lid)}.
+% meta(Level,Lid) -> {Level,Lid,access(Level,Lid)}.
 % meta(#group{id=Id,access=Access}) -> {group,Id,Access};
 meta(#board{id=Id,access=Access}) -> {board,Id,Access};
 meta(#thread{id=Id,access=Access}) -> {thread,Id,Access}.
 
-t() -> discavering(2, [meta(group,8), meta(board,2), meta(thread,4)]).
+% t() -> discavering(2, [meta(group,8), meta(board,2), meta(thread,4)]).
 
 discavering(User, AccessMetaList) ->
     case dive_access(AccessMetaList, ?DEFAULT_ACCESS_RULES, u:to_id(User)) of
-        none -> {error, access_denied};
-        Value -> {ok, Value}
+        none -> []; % {error, access_denied};
+        Value -> Value % {ok, Value}
     end.
 
 dive_access(_Access, [], _Uid) -> none;
 dive_access([], Acc, _Uid) -> Acc;
 dive_access([{Level,Lid,Access}=AccessMeta|Tail], Acc, Uid) ->
-    % wf:info(?MODULE, "dive_access: Acc: ~p",[Acc]),
+    wf:info(?MODULE, "dive_access: Acc: ~p",[Acc]),
     case check_access(Uid, Level, Lid, Access) of
         none -> none;
         skip -> dive_access(Tail, Acc, Uid);
         Checked -> % find first level and return
-            % wf:info(?MODULE, "dive_access: Checked: ~p",[Checked]),
+            wf:info(?MODULE, "dive_access: Checked: ~p",[Checked]),
             NewAccess=lists:foldl(fun({Action,Type}=AT, AccAnd) ->
-                % wf:info(?MODULE, "dive_access: Acc: ~p, AT: ~p, AccAnd: ~p",[Acc,AT,AccAnd]),
+                wf:info(?MODULE, "dive_access: Acc: ~p, AT: ~p, AccAnd: ~p",[Acc,AT,AccAnd]),
                 case access_merge(AT, Acc, logical_and) of nothing -> AccAnd; N -> [N|AccAnd] end
             end,[],Checked),
-            % wf:info(?MODULE, "dive_access: NewAccess: ~p",[NewAccess]),
+            wf:info(?MODULE, "dive_access: NewAccess: ~p",[NewAccess]),
             dive_access(Tail, NewAccess, Uid)
     end.
 
@@ -86,6 +104,7 @@ check_access(Uid, Level, Lid, Access) ->
     A = lists:foldl(fun(E, Acc) ->
             AT = case E of
                 {anonymous,Action,Type} -> case u:is_temp(Uid) of true -> {Action,Type}; _ -> skip end;
+                {registered,Action,Type} -> case u:is_temp(Uid) of false -> {Action,Type}; _ -> skip end;
                 {Group,Action,Type} ->
                     Acl = acl({{user,Uid},{Group,Level,Lid}}),
                     case check_time(Acl) of
@@ -93,10 +112,10 @@ check_access(Uid, Level, Lid, Access) ->
                         _ -> skip
                     end
             end,
-            % wf:info(?MODULE,"E: ~p Acc: ~p AT: ~p / To: ~p", [E,Acc,AT, {Level,Lid}]),
+            wf:info(?MODULE,"E: ~p Acc: ~p AT: ~p / To: ~p", [E,Acc,AT, {Level,Lid}]),
             access_merge(AT,Acc,logical_or)
         end,[],Access),
-    % wf:info(?MODULE,"check_access: ~p", [A]),
+    wf:info(?MODULE,"check_access: ~p", [A]),
     case A of [] -> none; _ -> A end.
  
 access_merge(skip, List, _Operation) -> List;

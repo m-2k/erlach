@@ -30,12 +30,15 @@ log_modules() ->
         image,
         u,
         html,
+        access,
+        routes,
         guard
         % n2o_binary
     ].
 
-log_level() -> warning.
+log_level() -> info.
 
-debug() -> true.
+% debug() -> false.
+debug() -> false.
 
 info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).

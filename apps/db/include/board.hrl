@@ -5,7 +5,7 @@
 % -define(ITERATOR(Container, Guard), id, container=Container, feed_id, prev, next, feeds=[], guard=Guard, etc).
 
 %% feed_id :: {group, integer()}
--record(board, {?ITERATOR(feed), ?ELEMENT,
+-record(board, {?DB_ELEMENT(feed),
     uri,
 	anonymous,
     description

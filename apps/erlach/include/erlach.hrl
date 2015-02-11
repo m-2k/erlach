@@ -1,13 +1,13 @@
 -define(ERLACH_VERSION, <<"0.2 beta">>).
 
--define(BOARD_ID, board_id).
--define(THREAD_ID, thread_id).
--define(USER_ID, anonymous).
+% -define(BOARD_ID, board_id).
+% -define(THREAD_ID, thread_id).
+% -define(USER_ID, anonymous).
 -define(SITE_ROOT_LOCATION, "apps/erlach/priv").
 -define(ATTACHMENT_LOCATION, "static/attachments").
--define(STORED_POST_ID, stored_post_id).
--define(STORED_REQUEST_TO, stored_request_to).
--define(MARKDOWN_ENABLED, markdown_enabled).
+% -define(STORED_POST_ID, stored_post_id).
+% -define(STORED_REQUEST_TO, stored_request_to).
+% -define(MARKDOWN_ENABLED, markdown_enabled).
 -define(NEWEST_POSTS, newest_posts).
 
 -record(cookie, {status :: new | actual | atom(), path, ttl, issued, expire}).
@@ -31,5 +31,8 @@
 
 -define(SITE_NAME, <<"Erlach">>).
 -define(TITLE_DELIMETER, <<" – "/utf8>>).
+-define(REQUESTS_BOARD, 2).
 
--define(ACTION_API, {Access, Board, Thread, {thread, Action, Data}}).
+-define(ACTION_API, {Access, Board, Thread, {Level, Action, Data}}).
+
+-define(IDS_BASE, 36).

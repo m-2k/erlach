@@ -8,11 +8,10 @@
 % feed: {post, PostId}
 % name: original name of file
 % mime: mime type
--record(attachment, {?ITERATOR(feed), ?ELEMENT,
+-record(attachment, {?DB_ELEMENT(feed),
 	path,
 	uuid,
 	description,
-	user,
 	mime,
 	position,
 	size,

@@ -19,21 +19,25 @@
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
 main()    -> % wf:redirect({http,<<"/sasay">>}).
-    R = avz:callbacks([twitter]),
+    _R = avz:callbacks([twitter]),
     #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {title,<<"Profile">>}]}.
-    
-names_list() ->
-    #panel{class= <<"flex-vertical">>, body = [
-        [#button{class= <<"primary">>, body= <<"Add"/utf8>>, postback={showform, addname}}] ++ lists:map(fun(N) ->
-            #span{class= <<"square">>, body= <<"", (guard:html_escape(N#name.displayname))/binary>>}
-            end, u:names()) ]}.
 
 body() ->
     Content = case ?SESSION:erase_param(?MODULE) of
         signin -> #button{body= <<"Auth with Twitter">>, class = <<"success center">>, postback={twitter,logintwitter}};
-        _ -> #panel{class = <<"flex-horizontal">>, body=[
-            names_list(),
-            html:username_edit()]}
+        _ ->
+            User = u:get(),
+            Title = case u:is_temp(User) of
+                true -> <<"Anonymous">>;
+                false -> guard:html_escape(User#user3.name)
+            end,
+            [ #panel{class= <<"content-title">>,body=Title },
+                html:username_form(),
+                #panel{body=[
+                % #panel{body=[#span{body= <<"Related accounts">>},acc_list()]},
+                % #panel{body=[#span{body= <<"Language">>},#span{body= <<"Default">>}]},
+                % #panel{body=[#span{body= <<"Time zone">>},#span{body= <<"Default">>}]}
+                ]} ]
     end,
     % wf:context((?CTX)#cx{req=wf:header(<<"Location">>,<<"/sasay">>,?REQ)}),
     
@@ -42,25 +46,69 @@ body() ->
     % wf:redirect({http,<<"/sasay">>}),
     html:body([ case config:debug() of true -> #span{body= wf:f("User: ~p", [u:get()])}; _ -> [] end, Content]).
 
+acc_list() -> [].
+
 event(init) -> ok;
-event({showform, addname}) ->
-    wf:update(<<"username-manage">>, html:username_add());
-event({username,add}) ->
-    html:info("SASAY LALKA reg" ++ wf:temp_id()),
-    html:success("SASAY LALKA reg" ++ wf:temp_id()),
-    html:warning("SASAY LALKA reg" ++ wf:temp_id()),
-    html:error("SASAY LALKA reg" ++ wf:temp_id());
-event(join) ->
-    case u:join() of
-        {ok, User} ->
-            wf:info(?MODULE, "User joined: ~p", [User]),
-            wf:update(joinpanel, #panel{id=joinpanel, body=[
-                #span{class= <<"hint center">>,body= <<"Successfully! Here is U'r password, remember this:">>},
-                #span{class= <<"clipboard center">>, body=wf:html_encode(wf:f("~s",[User#user3.password]))}
-            ]});
-        Err -> wf:info(?MODULE, "Error joining: ~p", [Err])
+event({name,write}=Action) ->
+    UserName = wf:to_binary(wf:q(username)),
+    User = u:get(),
+    case {re:run(UserName, "^(?=.{6,26}$)(?![_.])(?!.*[_.]{2})[a-z0-9._]+(?<![_.])$"), u:is_temp(User) } of
+        {{match, _}, false} when UserName =/= <<"anonymous">> ->
+            case kvs:get(name,UserName) of
+                {ok, _Exist} -> html:warning("Already exist, sorry, bro");
+                {error, not_found} ->
+                    Name=#name{
+                        id=UserName,
+                        feed_id={name,u:id(User)},
+                        created=erlang:now(),
+                        banned=false,
+                        deleted=false,
+                        birthday= <<>>
+                        },
+                    {ok, _Name2}=kvs:add(Name),
+                    
+                    wf:update(<<"username-manage">>, html:username_form(Action)),
+                    html:success("Yay! U now known also as " ++ wf:to_list(UserName));
+                E -> wf:error(?MODULE, "Unable to lookup name: ~p into DB: ~p",[UserName,E]),
+                    html:error("Some error, plz refresh page and try again")
+            end;
+        _ -> html:warning("Wrong name, allowed 6-26 lowercase symbols: 'a-z', '.' and '_'")
+    end,
+    
+    % wf:info(?MODULE, "New name: ~p",[is_binary(Name)]),
+    
+    
+    % html:info("SASAY LALKA reg" ++ wf:temp_id()),
+    % html:success("SASAY LALKA reg" ++ wf:temp_id()),
+    % html:warning("SASAY LALKA reg" ++ wf:temp_id()),
+    % html:error("SASAY LALKA reg" ++ wf:temp_id()),
+    ok;
+event({name,modify,Name}=Action) ->
+    case {kvs:get(name,Name), u:id()} of
+        {{ok, #name{feed_id={name,Uid}}=N}, Uid} ->
+            wf:update(<<"username-manage">>, html:username_form({name,modify,N}));
+        _ -> skip
     end;
-event(terminate) -> skip;
+event({name,update,Name}=Action) ->
+    case {kvs:get(name,Name), u:id()} of
+        {{ok, #name{feed_id={name,Uid}}=N}, Uid} ->
+            kvs:put(N#name{birthday=wf:q(about)}),
+            wf:update(<<"username-manage">>, html:username_form(Action));
+        _ -> skip
+    end;
+event({name, _}=Action) ->
+    wf:update(<<"username-manage">>, html:username_form(Action));
+% event(join) ->
+%     case u:join() of
+%         {ok, User} ->
+%             wf:info(?MODULE, "User joined: ~p", [User]),
+%             wf:update(joinpanel, #panel{id=joinpanel, body=[
+%                 #span{class= <<"hint center">>,body= <<"Successfully! Here is U'r password, remember this:">>},
+%                 #span{class= <<"clipboard center">>, body=wf:html_encode(wf:f("~s",[User#user3.password]))}
+%             ]});
+%         Err -> wf:info(?MODULE, "Error joining: ~p", [Err])
+%     end;
+event(terminate) -> wf:info(?MODULE,"Terminate",[]);
 
 % exist
 event({login, twitter, #token{user=UserID}, _Args}) ->

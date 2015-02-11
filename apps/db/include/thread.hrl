@@ -7,8 +7,7 @@
 
 
 %% feed_id :: {board, integer()}
--record(thread, {?ITERATOR(feed), ?ELEMENT,
-    topic,
+-record(thread, {?DB_ELEMENT(feed),
     head_post,
 	anonymous,
 	request_to,

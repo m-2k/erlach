@@ -22,13 +22,18 @@ message(Message, Class) ->
     Id=wf:temp_id(),
     wf:insert_top(<<"popup-messages">>, #link{id=Id, class=Class,
             onclick=wf:f("qi(\\'~s\\').parentNode.removeChild(qi(\\'~s\\'));",[Id,Id]),
-            body=[Message]}),
-    wf:wire(wf:f("window.setTimeout(function(){var a=qi('~s'); if(a){a.onclick();}},~b);",[Id,size(wf:to_binary(Message))*100+4000])).
+            body=guard:html_escape(Message)}),
+    wf:wire(wf:f("window.setTimeout(function(){var a=qi('~s'); if(a){a.onclick();}},~b);",[Id,size(wf:to_binary(Message))*100+4000])),
+    ok.
     % wf:wire(wf:f("var m=qi('~s');m.style.webkitAnimationName=m.style.animationName='popup-slide-left';", [Id])).
 
-
 title(_Module, ?ACTION_API) ->
-    Text = case Action of view -> Thread#thread.topic; _ -> [<<"New thread in ">>, Board#board.name] end,
+    Text = case {Level,Action} of
+        {thread,view} -> Thread#thread.name;
+        {thread, _} -> [<<"New thread in ">>, Board#board.name];
+        {board,view} -> Board#board.name;
+        _ -> "Erlach"
+    end,
     guard:to_binary([Text, ?TITLE_DELIMETER, ?SITE_NAME]).
 
 header() -> header(u:get()).
@@ -45,23 +50,24 @@ menu(User) ->
             end ]},
         #panel{class= <<"links left">>,body=[
             #link {class=Class, href= <<"#">>, body= <<"News">>},
-            #link {class=Class, href= <<"#">>, body= <<"Blog">>} ]} ].
+            #link {class=Class, href= <<"/board/1/blog">>, body= <<"Blog">>} ]} ].
     
 footer() ->
     Class=?FOOTER_LINKS,
     #panel{id= <<"footer">>,body = [
         #panel{class= <<"related-links">>,body=[
-            #link{class=Class, body= <<"Erlang Powered">>, href= <<"http://erlang.org">>},
-            #link{class=Class, body= <<"SynRC">>, href= <<"https://synrc.com">>},
-            #link{class=Class, body= <<"EoX">>, href= <<"http://erlangonxen.org">>},
-            #link{class=Class, body= <<"Tails">>, href= <<"https://tails.boum.org">>},
-            #link{class=Class, body= <<"Tor">>, href= <<"https://www.torproject.org">>},
-            #link{class=Class, body= <<"Digital Ocean">>, href= <<"https://digitalocean.com">>},
-            #link{class=Class, body= <<"N2O">>, href= <<"https://github.com/5HT/n2o">>},
-            #link{class=Class, body= <<"Cowboy">>, href= <<"https://github.com/ninenines/cowboy">>},
-            #link{class=Class, body= <<"NoSQL">>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
-            #link{class=Class, body= <<"BPG Ready">>, href= <<"http://bellard.org/bpg/">>},
-            #link{class=Class, body= <<"Flex CSS">>, href= <<"http://pepelsbey.net/pres/flexbox-gotcha/?full#Cover">>},
+            #link{class=Class, target="_blank", body= <<"Erlang Powered">>, href= <<"http://erlang.org">>},
+            #link{class=Class, target="_blank", body= <<"SynRC">>, href= <<"https://synrc.com">>},
+            #link{class=Class, target="_blank", body= <<"EoX">>, href= <<"http://erlangonxen.org">>},
+            #link{class=Class, target="_blank", body= <<"Tails">>, href= <<"https://tails.boum.org">>},
+            #link{class=Class, target="_blank", body= <<"Tor">>, href= <<"https://www.torproject.org">>},
+            #link{class=Class, target="_blank", body= <<"Digital Ocean">>, href= <<"https://digitalocean.com">>},
+            #link{class=Class, target="_blank", body= <<"N2O">>, href= <<"https://github.com/5HT/n2o">>},
+            #link{class=Class, target="_blank", body= <<"Cowboy">>, href= <<"https://github.com/ninenines/cowboy">>},
+            #link{class=Class, target="_blank", body= <<"NoSQL">>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
+            #link{class=Class, target="_blank", body= <<"BPG Ready">>, href= <<"http://bellard.org/bpg/">>},
+            #link{class=Class, target="_blank", body= <<"Markdown">>, href= <<"https://help.github.com/articles/markdown-basics/">>},
+            % #link{class=Class, body= <<"Flex CSS">>, href= <<"http://pepelsbey.net/pres/flexbox-gotcha/?full#Cover">>},
             #link{class=Class, body= <<"Erlach IBS, 2015"/utf8>>, href= <<"/privacy">>}
         ]}
     ]}.
@@ -69,15 +75,23 @@ footer() ->
 body(Content) -> [ html:header(u:get()), #panel{ id= <<"content">>, body=Content}, html:footer(),#panel{id= <<"popup-messages">>}].
 
 
+thread_body_private({Access, Board, Thread, {thread, Action, Data}}=S) ->
+    Head = [ #panel{class= <<"content-title">>,body="Access denied"}, #span{class= <<"remark">>,body="Remark"} ],
+    Manage = #panel{class= <<"center">>,body=[
+        #link{class = <<"button primary slim">>, body = <<"Request access">>, postback=null } ]},
+    [Head,Manage].
+
 thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
     
+    case config:debug() of true -> html:info("ACCESS: " ++ wf:to_list(Access)); _ -> ok end,
+
     AllowMarkdown = access:is_allow(blog,write,Access),
-    AllowWrite = access:is_allow(post,write,Access),
+    AllowWrite = access:is_allow(message,write,Access),
     wf:info(?MODULE, "State: ~p",[{AllowMarkdown,AllowWrite}]),
     
     Content = case Action of
         view ->
-            {Topic, ThType, ReqTo} = {Thread#thread.topic,Thread#thread.type,Thread#thread.request_to},
+            {Topic, ThType, ReqTo} = {Thread#thread.name,Thread#thread.type,Thread#thread.request_to},
             {ok,Head,Posts}=posts_list(Thread),
             [ #panel{class= <<"content-title">>,body=Topic},
                 case ThType of
@@ -90,8 +104,10 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
                     #panel{id= <<"drag-input-form">>,class= <<"drag-accepted">>,body=[
                         #panel{id= <<"text-input-form">>,body=[
                             #textarea{id= <<"message">>,class= <<"textarea">>,placeholder= <<"Message">>},
-                            #link{id= <<"store">>,class= <<"button primary">>,body= <<"Send message">>,
-                                postback={store, finalize},source=[message]},
+                            #panel{class= <<"right-container">>, body=[
+                                html:name_selector(u:get()),
+                                #link{id= <<"store">>,class= <<"button primary">>,body= <<"Send message">>,
+                                    postback={store, finalize},source=[message,name_selector]} ]},
                             #panel{id= <<"thumbnail-list">>}]}]};
                     true -> [] end ];
         create ->
@@ -99,11 +115,13 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
                 #panel{id= <<"text-input-form">>,body=[
                     #textbox{id= <<"topic">>, class = <<"textarea topic">>, placeholder = <<"Topic">> },
                     #textarea{id= <<"message">>, class = <<"textarea">>, placeholder = <<"Message">> },
-                    #link{id= <<"store">>,class= <<"button success">>,
-                        body = <<"New thread">>,
-                        postback={store, finalize}, source=[topic, message]},
-                    if AllowMarkdown -> #link{id=markdown,class= <<"button info">>,body= <<"Enable Markdown">>,postback=enable_markdown};
-                        true -> [] end,
+                    #panel{class= <<"right-container">>, body=[
+                        html:name_selector(u:get()),
+                        if AllowMarkdown -> #link{id=markdown,class= <<"button info">>,body= <<"Enable Markdown">>,postback=enable_markdown};
+                            true -> [] end,
+                        #link{id= <<"store">>,class= <<"button success">>,
+                            body = <<"New thread">>,
+                            postback={store, finalize}, source=[topic,message,name_selector]} ]},
                     #panel{id= <<"thumbnail-list">>}]}]}]
     end,
     #panel{id=imageboard,body=[Content,image_viewer()]}.
@@ -112,7 +130,7 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
 posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread) ->
     Uid = u:id(),
     IsAdmin = u:is_admin(),
-    case kvs:get(feed, {thread, Tid}) of
+    case kvs:get(feed, {post, Tid}) of
         {ok, F} ->
             AllPosts = kvs:traversal(post, F#feed.top, F#feed.entries_count, #iterator.prev),
             % wf:wire(#transfer{state=[{items,AllPosts}]}),
@@ -129,8 +147,8 @@ posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread) ->
             {error, feed_not_found}
     end.
 
-post_check_visibility(Uid,IsAdmin,#thread{type=ThType,request_to=ReqTo},#post{deleted=Deleted,head=IsHead,temporary=IsTemp,user=User}) ->
-    case {IsAdmin,IsHead,IsTemp,Deleted,ThType,User} of
+post_check_visibility(Uid,IsModerate,#thread{type=ThType,request_to=ReqTo},#post{deleted=Deleted,head=IsHead,temporary=IsTemp,user=User}) ->
+    case {IsModerate,IsHead,IsTemp,Deleted,ThType,User} of
         {_,_,true,_,_,_} -> skip;
         {true,_,_,_,_,_} -> ok;
         {_,_,_,true,_,_} -> skip;
@@ -140,23 +158,29 @@ post_check_visibility(Uid,IsAdmin,#thread{type=ThType,request_to=ReqTo},#post{de
         _ -> ok
     end.
 
-post(#post{feed_id={thread,Tid}}=P) ->
+post(#post{feed_id={post,Tid}}=P) ->
     {ok, Thread} = kvs:get(thread,Tid),
     post(Thread,P, u:is_admin(),u:id()).
-post(#thread{id=Tid,type=ThreadType,request_to=ReqTo}=Thread, #post{id=Id,type=PostType,feed_id ={thread,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead}=Post, IsAdmin,Uid) ->
+post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid) ->
 
-    wf:info(?MODULE, " >>> html_post Message: ~p", [Message]),
+    % wf:info(?MODULE, " >>> html_post Message: ~p", [Message]),
+    
+    IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
     % {{_Y,_M,_D},{Hour,Minute,Second}} = calendar:now_to_local_time(Timestamp),
-    Text = case PostType of
-        blog -> markdown:conv_utf8(Message);
-        message -> guard:html_escape(Message);
+    Text = case Markup of
+        markdown -> markdown:conv_utf8(Message);
         _ -> guard:html_escape(Message)
     end,
-    wf:info(?MODULE, " >>> html_post Converted message: ~p", [Text]),
-    
-    case {post_check_visibility(Uid,IsAdmin,Thread,Post),Deleted} of
+    % wf:info(?MODULE, " >>> html_post Converted message: ~p", [Text]),
+
+    Uid = u:id(),
+    % wf:warning(?MODULE,"~n~n uids: ~p ~p",[Tu,User]),
+    IsModerate = case {Tu,User} of {Uid,_} -> true; {_,Uid} -> true; _ -> false end,
+    Access = get(access),
+    case {post_check_visibility(Uid,IsModerate,Thread,Post),Deleted} of
         {ok,undefined} ->
-            Html = #panel { id = wf:f("post-~.36b", [Id]), class = <<"thread-post">>, body = [
+            Class = if IsBlog -> <<"thread-blog">>; true -> <<"thread-post">> end,
+            Html = #panel { id = wf:f("post-~.36b", [Id]), class = Class, body = [
                 % #panel{ class = <<"timestamp">>, body = guard:html_escape(wf:f("~2w:~2..0w:~2..0w", [Hour, Minute,Second])) },
                 % #panel{ class = <<"right-side">>, body = [
                     case {IsAdmin, IsHead} of
@@ -164,18 +188,23 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo}=Thread, #post{id=Id,type=P
                         {true, _} -> #button{ class = <<"warning">>, body = <<"Hide">>, postback = {hide_post, Id} };
                         _ -> [] end,
                     case ThreadType of
-                        request when ReqTo =/= undefined andalso IsAdmin =:= true ->
+                        request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
+                            
                             case u:id() of
-                                User -> [];
-                                _ -> 
-                                    case u:check_access(User,ReqTo) of
-                                        allow -> [];
-                                        _ -> #button{ class = <<"success">>,
-                                            body = <<"Join user ",(wf:to_binary(wf:to_list(Uid)))/binary," to ", (wf:to_binary(wf:to_list(ReqTo)))/binary>>,
+                                User -> []; % ignore self messages
+                                _ ->
+                                    % wf:warning(?MODULE,"JOIN: ~p ~p",[get(access),u:check_access(User,ReqTo)]),
+                                    {Level,Lid} = ReqTo,
+                                    case access:acl({{user,User}, {private,Level,Lid}}) of
+                                        {_Time1,_Time2} -> [];
+                                        _ -> #link{class= <<"button success">>,
+                                            body= "Join user " ++ wf:to_list(User) ++ " to " ++ wf:to_list(ReqTo),
                                             postback = {request, accepted, ReqTo, User, Id} } end end;
                         _ -> []
                     end,
-                    #span{ class = <<"username">>, body = <<"anonymous">> },
+                    case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
+                        anonymous -> <<"anonymous">>;
+                        Uname -> guard:html_escape(Uname) end } end,
                     #span{ class = <<"message">>, body = Text },
                     #panel{ class = <<"post-attachment">>, body = post_attachment(Post) }
                 %    ]}
@@ -189,7 +218,9 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo}=Thread, #post{id=Id,type=P
                                 true -> #button{ class = <<"success">>, body = <<"Show thread">>, postback = {show_thread, Tid} };
                                 _ -> #button{ class = <<"success">>, body = <<"Show">>, postback = {show_post, Id} }
                             end,
-                            #span{ class = <<"username">>, body = <<"anonymous">> },
+                            case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
+                                anonymous -> <<"anonymous">>;
+                                Uname -> guard:html_escape(Uname) end  } end,
                             #span{ class = <<"message">>, body = Text },
                             #panel{ class = <<"post-attachment">>, body = post_attachment(Post) }
                         %    ]}
@@ -200,11 +231,11 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo}=Thread, #post{id=Id,type=P
     end.
         
 post_attachment(#post{ id=Id } = _P) ->
-    case kvs:get(feed, {post, Id}) of
+    case kvs:get(feed, {attachment, Id}) of
         {ok, F} ->
             Attachments = kvs:traversal(attachment, F#feed.top, F#feed.entries_count, #iterator.prev),
             lists:map(fun(A) ->
-                #image{ image = A#attachment.path, class = <<"image">> }
+                #image{ image = "/" ++ A#attachment.path, class = <<"image">> }
                 end, lists:reverse(Attachments));
         NotFound ->
             wf:info(?MODULE, "Post ~p doesn't has attachments (feed: ~p reason: ~p)", [Id, {post, Id}, NotFound]),
@@ -212,23 +243,121 @@ post_attachment(#post{ id=Id } = _P) ->
     end.
 
 
+board_body_private({Access, Board, Thread, {board, Action, Data}}=S) ->
+    case u:is_temp() of
+        true ->
+            html:body(#panel{class= <<"center">>, body=[
+                #span{class= <<"content-title">>, body= <<"The board only for the elect">>},
+                #span{class= <<"remark">>, body= <<"To use this board authorization is needed and submit a request.">>},
+                #link{class= <<"button primary">>, body= <<"Auth">>, postback=signin}]});
+        _ ->
+            html:body(#panel{class= <<"center">>, body=[
+                #span{class= <<"content-title">>, body= <<"The board only for the elect">>},
+                case Board#board.request_thread of
+                    undefined -> [];
+                    Tid -> #link{class= <<"button success">>, body= <<"Make request for access to this board">>,url=qs:ml({thread, Tid}) }
+                end ]})
+    end.
 
-
-board_body(#board{id=Bid,name=Name,description=Description}=Board, Content) ->
+board_body({Access, #board{id=Bid,name=Name,description=Description}=Board, Thread, {board, Action, Data}}=S) ->
+    
+    case config:debug() of true -> html:info("ACCESS: " ++ wf:to_list(Access)); _ -> ok end,
+    
+    AllowRequest = access:is_allow(request,write,Access),
+    AllowMessage = access:is_allow(message,write,Access),
+    AllowBlog = access:is_allow(blog,write,Access),
+    
     Head = [ #panel{class= <<"content-title">>,body=Name}, #span{class= <<"remark">>,body=Description} ],
     Manage = #panel{class= <<"center">>,body=[
-        #link{class = <<"button primary slim">>, body = <<"New">>, postback={thread, create, {post, Bid}} },
-        case u:is_admin() of
-            true ->
+        case Data of
+            {thread, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Blog">>, href=qs:ml({board,blog,Bid}) },
+                if AllowMessage -> #link{class = <<"button primary slim">>, body = <<"New">>, postback={thread, create, {thread, Bid}} }; true -> [] end ];
+            {blog, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Threads">>, href=qs:ml({board,Bid}) },
+                if AllowBlog -> #link{class = <<"button primary slim">>, body = <<"New blog">>, postback={thread, create, {blog, Bid}} }; true -> [] end ]
+        end,
+        
+        if AllowRequest ->
                 case Board#board.request_thread of
-                    undefined -> #link{class= <<"button primary slim">>, body= <<"New request">>,postback={thread, create, {request, {board, Bid}}}};
-                    Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=wf:f("/thread?id=~b",[Rtid])}
-                end;
-            _ -> [] end ]},
-    Main = #panel{id= <<"threads">>, class= <<"line">>, body=Content},
+                    undefined -> #link{class= <<"button info slim">>, body= <<"New request">>,postback={thread, create, {request, {board, Bid}}}};
+                    Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,Rtid}) }
+                end; true -> [] end ]},
+    Main = #panel{id= <<"threads">>, class= <<"line">>, body=board_content(S)},
     Settings = case u:is_admin() of true -> settings_panel(board, Board); _ -> [] end,
     html:body([Head,Manage,Main,Settings,image_viewer()]).
+
+board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) ->
+    IsAdmin = u:is_admin(),
+    case kvs:get(feed, {thread, Bid}) of
+        {ok, TF} ->
+            wf:info(?MODULE, "body feed ~p", [TF]),
+            Threads = kvs:traversal(thread, TF#feed.top, TF#feed.entries_count, #iterator.prev),
+            {HeadPostList3, HeadBlogList2,RequestHeadPostList2} = lists:foldl(fun(T, {PL, BL, RL}) ->
+                {ok, #post{type=Type}=P} = kvs:get(post, T#thread.head_post),
+
+                % TODO: Last post must overwrite #thread.last_post_date
+                {ok, #feed{top=LastPostId}} = kvs:get(feed, {post, T#thread.id}),
+                {ok, #post{created=LastTimestamp}} = kvs:get(post, LastPostId),
+
+                case T#thread.type of
+                    % undefined -> {[{LastTimestamp,T,P}|PL], BL, RL};
+                    thread -> {[{LastTimestamp,T,P}|PL], BL, RL};
+                    % message -> {[{LastTimestamp,T,P}|PL], BL, RL};
+                    blog -> {PL, [{T,P}|BL], RL};
+                    request -> {PL, BL, [{T,P}|RL]}
+                end
+            end,{[],[],[]},Threads),
+            wf:info(?MODULE, "Head post list: ~p", [HeadPostList3]),
+
+            case Data of
+                {blog, _Bid} -> #panel{ body = [
+                        % #span{ body = wf:f("Blog count: ~p, Thread count: ~p", [length(HeadBlogList2),length(HeadPostList3)])},
+                        % html_blog(HeadBlogList2),
+                        lists:map(fun({T,P}) -> html_thread(T,P) end, HeadBlogList2)
+                    ]};
+                {thread, _Bid} ->
+                    % Bump sorting TODO: inject thread-element to top in feed when post written
+                    SortedPostList = lists:sort(fun({TS1,_T1,_P1},{TS2,_T2,_P2}) -> TS1 >= TS2 end, HeadPostList3),
+
+                    #panel{ body = [
+                        % #span{ body = wf:f("Blog count: ~p, Thread count: ~p", [length(HeadBlogList2),length(HeadPostList3)])},
+                        % html_blog(HeadBlogList2),
+                        lists:map(fun({_LastTimestamp,T,P}) -> html_thread(T,P) end, SortedPostList)
+                    ]}
+            end;
+        _Empty -> []
+    end.
+
+html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,markup=Markup}=Post) ->
     
+    Class = case ThreadType of blog -> <<"board-blog">>; _ -> <<"board-thread">> end,
+    Text = case Markup of
+        markdown -> markdown:conv_utf8(Message);
+        _ -> guard:html_escape(Message)
+    end,
+    
+    #panel {id=wf:f("thread-~.36b",[Id]),class=Class,body=[
+            #panel{class= <<"thread-topic">>,body=[
+                #link{class= <<"link">>,
+                    body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
+                    href=qs:ml({thread,Id})}
+            ]},
+            #span{class= <<"username">>,body= <<"anonymous">>},
+            #span{class= <<"message">>,body=Text},
+            #panel{class= <<"post-attachment">>,body=html:post_attachment(Post)}
+        ]}.
+
+% html_blog([]) -> [];
+% html_blog(HeadBlogList2) ->
+%     {#thread{id=Id, name=Topic}, #post{}} = lists:last(HeadBlogList2),
+%     #panel { class = <<"board-thread">>, body = [
+%             %         #link{
+%             % body = case guard:html_escape(Topic) of <<>> -> wf:f("#~w", [Id]); T -> T end,
+%             % href = wf:f("/thread?id=~p", [Id]) },
+%         #link{
+%             body = guard:html_escape(<<"Вся лента блога ("/utf8, (wf:to_binary(length(HeadBlogList2)))/binary,") >>>>"/utf8>>),
+%             href = wf:f("/board?id=~p&blog", [get(?BOARD_ID)]) }
+%     ]}.
+%
 settings_panel(board, #board{}=B) ->
     #panel { body = [
         #panel { class = <<"flex-container">>, body = [
@@ -265,15 +394,49 @@ image_viewer() ->
         #image{ id = <<"image-viewer-picture-back">> },
         #image{ id = <<"image-viewer-picture-front">> }]}.
 
-username_add() ->
-    #panel{id= <<"username-manage">>, class = <<"contact-modify-box">>, body = [
-        #button{class= <<"success">>, body= <<"Write">>, postback={username, add}, source=[]} ]}.
 
-username_edit() ->
-    #panel{id= <<"username-manage">>, class = <<"contact-modify-box">>, body = [
-    ]}.
-    
-    
+username_form() -> username_form({name,lookup}).
+username_form(Action) ->
+    wf:info(?MODULE,"Action: ~p",[Action]),
+    Content = case Action of
+        {name,create} -> [ #textbox{id=username,class= <<"textarea">>,placeholder= <<"U name">> },
+            #link{class= <<"button success">>, body= <<"Write">>, postback={name,write}, source=[username]},
+            #link{class= <<"button warning">>, body= <<"Cancel">>, postback={name,lookup}} ];
+        {name,modify,#name{id=Id,birthday=Bd}} -> [
+            #span{body=Id},
+            #textbox{id=about,class= <<"textarea">>,placeholder= <<"About">>,value=guard:html_escape(Bd) },
+            #link{class= <<"button success">>, body= <<"Update">>, postback={name,update,Id}, source=[about]},
+            #link{class= <<"button warning">>, body= <<"Cancel">>, postback={name,lookup}} ];
+        _ -> username_list()
+    end,
+    #panel{id= <<"username-manage">>,class= <<"contact-modify-box">>,body=Content }.
+
+username_list() ->
+    case u:is_temp() of
+        true -> [ #span{class= <<"remark">>,body= <<"U must be logged in to create names">>},
+            #link{class= <<"button primary">>, body= <<"Sign in">>, postback=signin}];
+        _ ->
+            HtmlNameList = lists:foldl(fun(#name{id=Name},Acc) ->
+                [ #link{class= <<"button dark">>,body=Name,postback={name,modify,Name}}|Acc ]
+                end,[],u:names()),
+            AddButton = #link{ class= <<"button primary">>, body= <<"Add name"/utf8>>, postback={name,create}},
+            [HtmlNameList,AddButton]
+    end.
+
+name_selector(User) ->
+    NameList=u:names(User),
+    {_,Map,OptList}=lists:foldl(fun(#name{id=Id},{Num,Macc,Acc}) ->
+        Opt = #option{id=wf:temp_id(),label="",value=Num,title="",body=guard:html_escape(Id)},
+        {Num-1,maps:put(wf:to_list(Num),Id,Macc),[Opt|Acc]}
+        end,{length(NameList),#{},[]},NameList),
+    erlang:put(namelist_map,Map),
+    wf:wire(#transfer{state=[{namelist_map,Map}]}),
+    AnonOpt = #option{id=wf:temp_id(),label="",value=0,title="",body= "anonymous"},
+    #select{id=name_selector,class= <<"name-selector">>,body=[
+        #optgroup{label="Select name",body=[AnonOpt|OptList]} ]}.
+
+name_selector_extract(Number) -> maps:get(Number,erlang:get(namelist_map),anonymous).
+
 logo() ->
     <<"<svg width='100px' height='20px' viewBox='-2 0 284 50' version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' xmlns:sketch='http://www.bohemiancoding.com/sketch/ns'>
         <g id='Page-1' stroke='#26c6da' stroke-width='2' fill='black' fill-rule='evenodd' sketch:type='MSPage'>

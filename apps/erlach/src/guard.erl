@@ -10,6 +10,10 @@ to_integer(B) when is_binary(B) -> to_integer(binary_to_list(B));
 to_integer(L) when is_list(L) -> case string:to_integer(L) of {I,[]} -> I; _ -> undefined end;
 to_integer(_) -> undefined.
 
+to_integer(B,Base) when is_binary(B) andalso is_integer(Base) -> to_integer(binary_to_list(B),Base);
+to_integer(L,Base) when is_list(L) andalso is_integer(Base) -> try erlang:list_to_integer(L,Base) catch _:_ -> undefined end;
+to_integer(_,_Base) -> undefined.
+
 to_binary(List) -> erlang:iolist_to_binary(List).
 
 is_empty(<<>>) -> true;

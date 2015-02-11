@@ -94,16 +94,18 @@ mime_type(Binary) ->
 
 % TODO: convert(?MIME_IMAGE_JPEG, Binary)
 convert(?MIME_IMAGE_JPEG=Mime, Binary, Quality) -> image:optim(Mime,Binary,Quality);
-convert(?MIME_IMAGE_PNG=Mime, Binary, _Quality) ->
-    {ok,GD} = gd:new(), % {ok,{gd,#Port<0.10123>}}
-    {ok,Ptr} = gd:image_create_from_png_ptr(GD, Binary),   % {ok,0}
-    {ok,Converted} = gd:image_png_ptr(GD, Ptr),
-    {ok, Mime, Converted};
-convert(?MIME_IMAGE_GIF=Mime, Binary, _Quality) ->
-    {ok,GD} = gd:new(), % {ok,{gd,#Port<0.10123>}}
-    {ok, Ptr} = gd:image_create_from_gif_ptr(GD, Binary),   % {ok,0}
-    {ok, Converted} = gd:image_gif_ptr(GD, Ptr),
-    {ok, Mime, Converted}.
+convert(?MIME_IMAGE_PNG=Mime,  Binary, Quality) -> image:optim(Mime,Binary,Quality);
+convert(?MIME_IMAGE_GIF=Mime,  Binary, Quality) -> image:optim(Mime,Binary,Quality).
+% convert(?MIME_IMAGE_PNG=Mime, Binary, _Quality) ->
+%     {ok,GD} = gd:new(), % {ok,{gd,#Port<0.10123>}}
+%     {ok,Ptr} = gd:image_create_from_png_ptr(GD, Binary),   % {ok,0}
+%     {ok,Converted} = gd:image_png_ptr(GD, Ptr),
+%     {ok, Mime, Converted};
+% convert(?MIME_IMAGE_GIF=Mime, Binary, _Quality) ->
+%     {ok,GD} = gd:new(), % {ok,{gd,#Port<0.10123>}}
+%     {ok, Ptr} = gd:image_create_from_gif_ptr(GD, Binary),   % {ok,0}
+%     {ok, Converted} = gd:image_gif_ptr(GD, Ptr),
+%     {ok, Mime, Converted}.
 
 optim({_, Ext}=Mime, Image, Quality) ->
     Opts = case {Mime,Quality} of
@@ -125,7 +127,9 @@ optim({_, Ext}=Mime, Image, Quality) ->
                 {interlace, "Line"}, % Use Line to create an interlaced PNG or GIF or progressive JPEG image.
                 % {'gaussian-blur', "0.05"}, % compress up to 2x
                 % {unsharp, "2x0.5+0.7+0"},
-                {filter, "Lanczos"} ]
+                {filter, "Lanczos"} ];
+        {?MIME_IMAGE_GIF, _} -> [ {strip} ];
+        {?MIME_IMAGE_PNG, _} -> [ {strip} ]
     end,
     
     wf:info(?MODULE, "Image converting  ~p ~p", [Opts,?EMAGICK_APP_ENV]),

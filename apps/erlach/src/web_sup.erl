@@ -24,7 +24,7 @@ init([]) ->
         X -> io:format("Unknown Error: ~p\r\n",[X]), halt(abort,[]) end,
 
     kvs:join(),
-    case kvs:get(board,1) of {ok, _} -> ok; _ -> root:c() end,
+    case kvs:get(board,1) of {ok, _} -> ok; _ -> utils:init_db() end,
 	
 	% start_child(image),
 	% supervisor:start_child(web_sup, {image, {image, start_link, []}, transient,1000,worker,[image]}),
@@ -40,6 +40,9 @@ dispatch_rules() ->
             {"/n2o/[...]", n2o_dynalo, {dir, "deps/n2o/priv", mime()}},
             {"/rest/:resource", rest_cowboy, []},
             {"/rest/:resource/:id", rest_cowboy, []},
-            {"/ws/[...]", bullet_handler, [{handler, n2o_bullet}]},
-            {'_', n2o_cowboy, []}
+            % {"/ws/[...]", bullet_handler, [{handler, n2o_bullet}]},
+            {"/ws/[:module/[:id/[:extra/[...]]]]", bullet_handler, [{handler, n2o_bullet}]},
+            % {"/[:module/[:id/[blog]]]", [{id, int}], n2o_cowboy, []}
+            {"/[:module/[:id/[:extra/[...]]]]", n2o_cowboy, []}
+            % {'_', n2o_cowboy, []}
     ]}]).

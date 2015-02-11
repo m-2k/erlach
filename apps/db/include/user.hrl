@@ -6,7 +6,7 @@
 
 -record(name, {?ITERATOR(feed),
     % id,
-	name,		% not use
+    % name,        % not use
 	displayname,% not use
 	created,	% timestamp
     banned,		% infinity | {expired, date()}
@@ -24,7 +24,7 @@
 % {moderate, board, Id}
 % {moderate, users} % ban
 
--record(user3, {?ITERATOR(feed), ?ELEMENT,
+-record(user3, {?DB_ELEMENT(feed),
 	balance,
     expired,
     enabled,
