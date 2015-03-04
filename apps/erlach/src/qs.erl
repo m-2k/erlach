@@ -30,3 +30,4 @@ ml({thread,create})       -> "/thread";
 ml({thread,Id})       -> "/thread/" ++ erlang:integer_to_list(Id, ?IDS_BASE);
 ml({board,Id})        -> "/board/"  ++ erlang:integer_to_list(Id, ?IDS_BASE);
 ml({board,blog,Id}) -> "/board/"  ++ erlang:integer_to_list(Id, ?IDS_BASE) ++ "/blog".
+

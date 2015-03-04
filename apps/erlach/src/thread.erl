@@ -62,7 +62,7 @@ check_access_to_thread(Tid, Action) ->
 %             {ok, {Access, Board, Thread, Action}};
 %         E -> E end.
     Access=access:discavering(User,AccessMetaList),
-    wf:wire(#transfer{state=[{board,Board},{thread,Thread},{action,Action}]}),
+    wf:wire(#transfer{state=[{board,Board},{thread,Thread},{action,Action},{access,Access}]}),
     {ok, {Access, Board, Thread, Action}}.
 
 check_access_to_board(Bid, Action) ->
@@ -76,7 +76,7 @@ check_access_to_board(Bid, Action) ->
     %         {ok, {Access, Board, undefined, Action}};
     %     E -> E end.
     Access=access:discavering(User,AccessMetaList),
-    wf:wire(#transfer{state=[{board,Board},{action,Action}]}),
+    wf:wire(#transfer{state=[{board,Board},{action,Action},{access,Access}]}),
     {ok, {Access, Board, undefined, Action}}.
 
 event(init) ->
@@ -102,23 +102,37 @@ event(init) ->
 event({client, auto_store}) ->
     wf:info(?MODULE,"Auto store",[]),
     message(store);
-event({store, finalize}) ->
+event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
     wf:info(?MODULE,"Final storing",[]),
     % wf:info(?MODULE,"~p ~p",[u:id(),wf:q(name_selector)]),
     case guard:is_empty(wf:q(message)) of
         true -> html:warning("Nothing to publish, bro.");
         false ->
             {ok, {T,P}} = message(finalize),
+            % P=message(store),
             erlang:put(attachments,[]),
-            B = erlang:get(board),
+            B=erlang:get(board),
+            % T=erlang:get(thread),
+            wf:info(?MODULE,"Final storing -sending",[]),
             wf:send({thread,T#thread.id},{server, {add, post, P, self()}}),
             case erlang:get(action) of
                 {thread,create,{request, _}} -> wf:redirect(qs:ml({thread,T#thread.id}));
                 {thread,create,{blog,_}} -> wf:redirect(qs:ml({board,blog,B#board.id}));
                 {thread,create,_} -> wf:redirect(qs:ml({board,B#board.id}));
                 _ ->
+                    wf:info(?MODULE,"Final storing -wiring",[]),
                     wf:wire("publish_finished();"),
-                    add_post(P) end end;
+                    wf:info(?MODULE,"Final storing -wiring2",[]),
+                    if Store =:= edit ->
+                        {ok,HtmlPost}=html:post(P),
+                        wf:info(?MODULE,"Final storing -htmlpost",[]),
+                        wf:update(html:input_form_id(),HtmlPost),
+                        ?JS_IMAGE_LIST_CHANGED_LESTENER,
+                        wf:info(?MODULE,"Final storing -img update",[]),
+                        wf:insert_after(posts,html:input_form(view,erlang:get(access)));
+                    true -> add_post(P) end end
+            % {ok,_}=message(finalize)
+    end;
 
 event({request, accepted, {Level,Lid}=ReqTo, User, PostId}) ->
     wf:info(?MODULE, "Granting access to ~p for ~p", [ReqTo,User]),
@@ -170,6 +184,12 @@ event({show_post, Id}) ->
         end,
         update_post(Id)
     end, {feature, admin});
+event({edit_post,Id}) ->
+    wf:info(?MODULE, "Edit post: ~p", [Id]),
+    Post=message({restore,Id}),
+    wf:remove(html:input_form_id()),
+    wf:update(utils:hex_id({post,Id}),html:input_form(edit,erlang:get(access))),
+    wf:wire("textarea_init(qi(\"message\"));drag_input_init();");
 event(enable_markdown) ->
     % u:restricted_call(fun() ->
         wf:update(markdown,#link{id=markdown,class= <<"button warning">>,body= <<"Disable Markdown">>,postback=disable_markdown}),
@@ -264,7 +284,7 @@ event(terminate) ->
 event(Event) -> guard:shared_event(?MODULE, Event).
 
 update_post(Id) ->
-    HexId=wf:f("post-~.36b", [Id]),
+    HexId=utils:hex_id({post,Id}),
     case kvs:get(post, Id) of
         {ok, Post} ->
             case html:post(Post) of
@@ -283,6 +303,12 @@ add_post(Id) ->
     case kvs:get(post, Id) of
         {ok, Post} -> add_post(Post);
         Err -> wf:warning(?MODULE, "Adding post failed ~p", [Err]) end.
+
+
+board({restore,Id}) ->
+    erlang:erase(board),
+    {ok, #board{}=B} = kvs:get(board, Id),
+    erlang:put(board, B), B.
 
 thread(create) ->
     #board{id=Bid} = erlang:get(board),
@@ -309,9 +335,16 @@ thread(store) ->
             erlang:put(thread, T2), T2;
         _ -> T end,
     T3;
+
+thread({restore,Id}) ->
+    erlang:erase(thread),
+    {ok, #thread{feed_id={thread,Bid}}=T} = kvs:get(thread, Id),
+    board({restore,Bid}),
+    erlang:put(thread, T), T;
+
 thread(finalize) ->
     T = thread(store),
-    Uname=html:name_selector_extract(wf:q(name_selector)),
+    Uname=html:name_selector_extract(wf:q(name_selector)), % only for create
     case erlang:get(action) of
         {thread, create, {request=Type, {board=Level, Lid}}} ->
             {ok,E}=kvs:get(Level,Lid),
@@ -363,7 +396,13 @@ message(store) ->
     P2 = P#post{message=wf:to_binary(guard:prevent_undefined(wf:q(message),<<>>))},
     kvs:put(P2),
     erlang:put(post, P2), P2;
-            
+
+message({restore,Id}) ->
+    erlang:erase(post),
+    {ok, #post{feed_id={post,Tid}}=P} = kvs:get(post, Id),
+    thread({restore,Tid}),
+    erlang:put(post, P), P;
+
 message(finalize) ->
     P = message(store),
     {ok, T} = thread(finalize),

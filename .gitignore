@@ -8,3 +8,7 @@ logs
 /deps/
 apps/erlach/priv/static/attachments/
 Mnesia.nonode*
+
+.rebarinfo
+
+*.app

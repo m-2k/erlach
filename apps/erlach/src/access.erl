@@ -37,7 +37,7 @@ restrict(Table,Id) ->
     end,
     kvs:put(E2).
 
-acl({{user,1}, {private,board,2}}) -> {infinity,infinity};
+acl({{user,1}, {private,board,1}}) -> {infinity,infinity};
 acl({{user,1}, {private,board,6}}) -> {infinity,infinity};
 acl({{user,1}, {private,thread,10}}) -> {infinity,infinity};
 

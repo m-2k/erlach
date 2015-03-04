@@ -743,7 +743,7 @@ html {
 .glassy #header:after, .glassy #footer:before { border: none; }
 
 body.glassy, .glassy #header::before, .glassy #footer::before {
-	background: url(/static/cover-300.jpg) no-repeat center center fixed;
+	background: url(/static/cover-306.jpg) no-repeat center center fixed;
 	background-size: cover;
 /*	position: absolute;*/
 /*	-webkit-transform: translateZ(0);*/

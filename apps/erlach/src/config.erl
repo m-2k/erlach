@@ -40,6 +40,6 @@ log_modules() ->
 log_level() -> info.
 
 % debug() -> false.
-debug() -> false.
+debug() -> true.
 
 info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).

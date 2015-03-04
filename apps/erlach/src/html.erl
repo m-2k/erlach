@@ -85,49 +85,51 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
     
     case config:debug() of true -> html:info("ACCESS: " ++ wf:to_list(Access)); _ -> ok end,
 
-    AllowMarkdown = access:is_allow(blog,write,Access),
     AllowWrite = access:is_allow(message,write,Access),
-    wf:info(?MODULE, "State: ~p",[{AllowMarkdown,AllowWrite}]),
+    wf:info(?MODULE, "State: ~p",[AllowWrite]),
     
     Content = case Action of
         view ->
             {Topic, ThType, ReqTo} = {Thread#thread.name,Thread#thread.type,Thread#thread.request_to},
-            {ok,Head,Posts}=posts_list(Thread),
+            {ok,Head,Posts}=posts_list(Thread,Access),
             [ #panel{class= <<"content-title">>,body=Topic},
                 case ThType of
                     request when ReqTo =/= undefined ->
                         #span{class= <<"remark">>,body= <<"This thread is request for ", (wf:to_binary(wf:to_list(ReqTo)))/binary>>};
                     _ -> []
                 end,    
-                #panel{id=posts,body=[Head,Posts]},
-                if AllowWrite ->
-                    #panel{id= <<"drag-input-form">>,class= <<"drag-accepted">>,body=[
-                        #panel{id= <<"text-input-form">>,body=[
-                            #textarea{id= <<"message">>,class= <<"textarea">>,placeholder= <<"Message">>},
-                            #panel{class= <<"right-container">>, body=[
-                                html:name_selector(u:get()),
-                                #link{id= <<"store">>,class= <<"button primary">>,body= <<"Send message">>,
-                                    postback={store, finalize},source=[message,name_selector]} ]},
-                            #panel{id= <<"thumbnail-list">>}]}]};
-                    true -> [] end ];
-        create ->
-            [ #panel{id= <<"drag-input-form">>,class= <<"drag-accepted">>,body=[
+                #panel{id=posts,body=[Head,Posts]} ];
+        create -> [ ]
+    end,
+    #panel{id=imageboard,body=[Content,input_form(Action,Access),image_viewer()]}.
+
+input_form_id() -> <<"drag-input-form">>.
+input_form(Action,Access) ->
+    case access:is_allow(message,write,Access) of % allow write
+        true ->
+            AllowMarkdown = access:is_allow(blog,write,Access),
+            {Topic,BClass,BBody,BSource,BPostback,Text} = case Action of
+                view -> {[],<<"button primary">>,<<"Send message">>,[message,name_selector],{store,finalize},<<>>};
+                create -> {#textbox{id= <<"topic">>, class= <<"textarea topic">>, placeholder= <<"Topic">> },
+                    <<"button success">>,<<"New thread">>,[topic,message,name_selector],{store,finalize},<<>>};
+                edit ->
+                    #post{markup=Markup,message=Message}=erlang:get(post),
+                    M2=guard:plaintext_escape(Message),
+                    {[],<<"button info">>,<<"Update message">>,[message,name_selector],{edit,finalize},M2}
+            end,
+            #panel{id=input_form_id(),class= <<"drag-accepted">>,body=[
                 #panel{id= <<"text-input-form">>,body=[
-                    #textbox{id= <<"topic">>, class = <<"textarea topic">>, placeholder = <<"Topic">> },
-                    #textarea{id= <<"message">>, class = <<"textarea">>, placeholder = <<"Message">> },
+                    Topic,
+                    #textarea{id= <<"message">>,class= <<"textarea autostore">>,placeholder= <<"Message">>,body=Text,rows= <<"1">>},
                     #panel{class= <<"right-container">>, body=[
-                        html:name_selector(u:get()),
+                        name_selector(u:get()),
                         if AllowMarkdown -> #link{id=markdown,class= <<"button info">>,body= <<"Enable Markdown">>,postback=enable_markdown};
                             true -> [] end,
-                        #link{id= <<"store">>,class= <<"button success">>,
-                            body = <<"New thread">>,
-                            postback={store, finalize}, source=[topic,message,name_selector]} ]},
-                    #panel{id= <<"thumbnail-list">>}]}]}]
-    end,
-    #panel{id=imageboard,body=[Content,image_viewer()]}.
+                        #link{id= <<"store">>,class=BClass,body=BBody,postback=BPostback,source=BSource} ]},
+                    #panel{id= <<"thumbnail-list">>}]}]};
+        _ -> [] end.
 
-
-posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread) ->
+posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread,Access) ->
     Uid = u:id(),
     IsAdmin = u:is_admin(),
     case kvs:get(feed, {post, Tid}) of
@@ -135,7 +137,7 @@ posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread) ->
             AllPosts = kvs:traversal(post, F#feed.top, F#feed.entries_count, #iterator.prev),
             % wf:wire(#transfer{state=[{items,AllPosts}]}),
             {Head, Posts} = lists:foldl(fun(P, {H,Acc}) ->
-                case {H,P#post.head,post(Thread,P,IsAdmin,Uid)} of
+                case {H,P#post.head,post(Thread,P,IsAdmin,Uid,Access)} of
                     {undefined,true, {ok, Html}} -> {Html,Acc};  % first head post
                     {_,        false,{ok, Html}} -> {H,[Html|Acc]}; % message posts
                     % {_,{skip, access}} -> {H,Acc};
@@ -160,33 +162,34 @@ post_check_visibility(Uid,IsModerate,#thread{type=ThType,request_to=ReqTo},#post
 
 post(#post{feed_id={post,Tid}}=P) ->
     {ok, Thread} = kvs:get(thread,Tid),
-    post(Thread,P, u:is_admin(),u:id()).
-post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid) ->
+    post(Thread,P, u:is_admin(),u:id(),erlang:get(access)).
+post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,_Access) ->
 
     % wf:info(?MODULE, " >>> html_post Message: ~p", [Message]),
     
     IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
     % {{_Y,_M,_D},{Hour,Minute,Second}} = calendar:now_to_local_time(Timestamp),
-    Text = case Markup of
-        markdown -> markdown:conv_utf8(Message);
-        _ -> guard:html_escape(Message)
-    end,
+    Text = utils:html_message(Post),
     % wf:info(?MODULE, " >>> html_post Converted message: ~p", [Text]),
 
     Uid = u:id(),
     % wf:warning(?MODULE,"~n~n uids: ~p ~p",[Tu,User]),
     IsModerate = case {Tu,User} of {Uid,_} -> true; {_,Uid} -> true; _ -> false end,
-    Access = get(access),
+    % Access = get(access),
+    V = post_check_visibility(Uid,IsModerate,Thread,Post),
+    wf:info(?MODULE, " >>> html_post Visible: ~p", [V]),
     case {post_check_visibility(Uid,IsModerate,Thread,Post),Deleted} of
         {ok,undefined} ->
             Class = if IsBlog -> <<"thread-blog">>; true -> <<"thread-post">> end,
-            Html = #panel { id = wf:f("post-~.36b", [Id]), class = Class, body = [
+            Html = #panel { id = utils:hex_id({post,Id}), class = Class, body = [
                 % #panel{ class = <<"timestamp">>, body = guard:html_escape(wf:f("~2w:~2..0w:~2..0w", [Hour, Minute,Second])) },
                 % #panel{ class = <<"right-side">>, body = [
                     case {IsAdmin, IsHead} of
                         {true, true} -> #button{ class = <<"warning">>, body = <<"Hide thread">>, postback = {hide_thread, Tid} };
                         {true, _} -> #button{ class = <<"warning">>, body = <<"Hide">>, postback = {hide_post, Id} };
                         _ -> [] end,
+                    case (not u:is_temp(Uid)) andalso User =:= Uid of true -> html:error(wf:to_list(Id)),
+                        #button{ class = <<"warning">>, body = <<"Edit">>, postback = {edit_post, Id} }; _ -> [] end,
                     case ThreadType of
                         request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
                             
@@ -213,7 +216,7 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
         {ok,_} ->
             case IsAdmin of
                 true ->
-                    Html = #panel { id = wf:f("post-~.36b", [Id]), class = <<"thread-post">>, body = [
+                    Html = #panel { id = utils:hex_id({post,Id}), class = <<"thread-post">>, body = [
                             case IsHead of
                                 true -> #button{ class = <<"success">>, body = <<"Show thread">>, postback = {show_thread, Tid} };
                                 _ -> #button{ class = <<"success">>, body = <<"Show">>, postback = {show_post, Id} }
@@ -312,7 +315,7 @@ board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) -
                 {blog, _Bid} -> #panel{ body = [
                         % #span{ body = wf:f("Blog count: ~p, Thread count: ~p", [length(HeadBlogList2),length(HeadPostList3)])},
                         % html_blog(HeadBlogList2),
-                        lists:map(fun({T,P}) -> html_thread(T,P) end, HeadBlogList2)
+                        lists:map(fun({T,P}) -> html_thread(T,P) end, lists:reverse(HeadBlogList2))
                     ]};
                 {thread, _Bid} ->
                     % Bump sorting TODO: inject thread-element to top in feed when post written
@@ -331,12 +334,9 @@ html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Mess
     
     IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
     Class = case IsBlog of true -> <<"board-blog">>; _ -> <<"board-thread">> end,
-    Text = case Markup of
-        markdown -> markdown:conv_utf8(Message);
-        _ -> guard:html_escape(Message)
-    end,
+    Text = utils:html_message(Post),
     
-    #panel {id=wf:f("thread-~.36b",[Id]),class=Class,body=[
+    #panel {id=utils:hex_id({thread,Id}),class=Class,body=[
             #panel{class= <<"thread-topic">>,body=[
                 #link{class= <<"link">>,
                     body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,

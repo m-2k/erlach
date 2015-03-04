@@ -79,6 +79,21 @@ html_escape(<<U,T/binary>>, Acc) -> % when U =< 62 andalso U >= 0 ->
 html_escape(B) when is_binary(B) -> html_escape(B, <<>>);
 html_escape(B) -> html_escape(wf:to_binary(B), <<>>).
 
+plaintext_escape(<<>>, Acc) -> Acc;
+plaintext_escape(<<U,T/binary>>, Acc) ->
+    R = case U of
+        $\n ->  <<"\\n">>;
+        $\t ->  <<"\\t">>;
+        $\r ->  <<>>;
+        U when U =< 0 -> <<>>;
+        _ -> <<U>>
+    end,
+    plaintext_escape(T, <<Acc/binary,R/binary>>).
+plaintext_escape(B) when is_binary(B) -> plaintext_escape(B, <<>>);
+plaintext_escape(B) -> plaintext_escape(wf:to_binary(B), <<>>).
+
+strip(Any) -> binary:replace(wf:to_binary(Any),[<<$\n>>,<<$\r>>,<<$\t>>],<<>>,[global]).
+
 % html_escape(<<U,T/binary>>) when U >= 128 and U <= 191 -> <<U,T/binary>>;
 % html_escape(<<U2,U1,T/binary>>) when U2 >= 194 and U2 <= 223 and U1 >= 128 and U1 <= 191 -> <<U,T/binary>>;
 % html_escape(<<U4,U3,U2,U1,T/binary>>) -> <<>>;

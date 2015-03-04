@@ -6,31 +6,33 @@ var thumb_iterator = 0;
 $binary.do = function(e) { debugger; console.log("BINARY: " + e) };
 $bert.do = function(e) { console.log("BERT: " + e) };
 
-var ipt = document.getElementById('drag-input-form');
-if(ipt) {
-    var resetTimer;
-    var className = 'over';
+function drag_input_init() {
+    var ipt = document.getElementById('drag-input-form');
+    if(ipt) {
+        var resetTimer;
+        var className = 'over';
 
-    var resetUploadForm = function() {
-        var f = function() { ipt.classList.remove(className); };
-        resetTimer = window.setTimeout(f, 50);
-    }
+        var resetUploadForm = function() {
+            var f = function() { ipt.classList.remove(className); };
+            resetTimer = window.setTimeout(f, 50);
+        }
     
-    document.body.addEventListener("dragover", function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        if (resetTimer) { clearTimeout(resetTimer); }
-        ipt.classList.add(className);
-    }, true);
-    document.body.addEventListener("dragleave", resetUploadForm, true);
-    document.body.addEventListener("drop", resetUploadForm, true);  // For Body
-    ipt.addEventListener("drop", function(e) {                      // For Form (overloaded)
-      e.stopPropagation();
-      e.preventDefault();
-      resetUploadForm();
-      handleFileSelect(e);
-    }, false);
-}
+        document.body.addEventListener("dragover", function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            if (resetTimer) { clearTimeout(resetTimer); }
+            ipt.classList.add(className);
+        }, true);
+        document.body.addEventListener("dragleave", resetUploadForm, true);
+        document.body.addEventListener("drop", resetUploadForm, true);  // For Body
+        ipt.addEventListener("drop", function(e) {                      // For Form (overloaded)
+          e.stopPropagation();
+          e.preventDefault();
+          resetUploadForm();
+          handleFileSelect(e);
+        }, false);
+    };
+};
 
 function fileLoadFinished(pos) {
 	// var thumb = document.querySelectorAll("#thumbnail-list canvas")[pos];
@@ -167,28 +169,30 @@ function handleFileSelect(evt) {
 
 /* TEXTAREA VERTICAL AUTORESIZE START */
 
-function h(e) {
+function textarea_height_calc(e) {
     e.style.height = "auto";
     e.style.overflowY = "hidden";
     e.style.height = e.scrollHeight;
 }
+function textarea_init(t) {
+    // t.rows=1; // hardcoded for best performans
+    textarea_height_calc(t);
+    t.addEventListener('input', function () { textarea_height_calc(this) } );
+    if(t.classList.contains('autostore')) { textarea_init_autostore(t); };
+};
 var ta_elements = document.querySelectorAll('textarea');
-Array.prototype.forEach.call(ta_elements, function(el, i){
-  el.rows=1;
-  h(el);
-  el.addEventListener('input', function () { h(this) } );
-});
+Array.prototype.forEach.call(ta_elements, function(t, i){ textarea_init(t) });
 
 /* TEXTAREA VERTICAL AUTORESIZE END */
 
 /* TEXTAREA SHADOW PROCESSES START */
 
 var STORE_TIMEOUT = 4000;
-var textarea = document.getElementById('message');
-if(textarea) {
-    var textarea_topic = document.getElementById('topic');
+var storeTimer;
+// var textarea = document.getElementById('message');
+function textarea_init_autostore(t) {
+    // var textarea_topic = document.getElementById('topic');
     // var send_message = document.getElementById('send_message');
-    var storeTimer;
     var onchange = function() {
     
         /// Enabling button
@@ -196,7 +200,7 @@ if(textarea) {
     
         /// Shadow text storing
         window.clearTimeout(storeTimer);
-        if(textarea.value !== "") {
+        if(t.value !== "") {
             storeTimer = window.setTimeout(function(){
                 console.log("Auto storing");
                 // if (textarea_topic) {
@@ -212,14 +216,14 @@ if(textarea) {
     
     
     }
-    textarea.addEventListener('change', onchange);
-    textarea.addEventListener('keyup', onchange);
+    t.addEventListener('change', onchange);
+    t.addEventListener('keyup', onchange);
 };
 
 function publish_finished() {
 	// debugger;
     window.clearTimeout(storeTimer);
-    textarea.value="";
+    qi('message').value="";
     
     thumbnails = {};
     thumb_iterator = 0;

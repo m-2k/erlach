@@ -20,6 +20,11 @@
 to_digit(N) when N < 10 -> $0 + N;
 to_digit(N) -> $a + N-10.
 
+
+hex_id({Atom,Id}) -> [atom_to_list(Atom),"-",integer_to_list(Id,36)].
+hex_id_lower({Atom,Id}) -> string:to_lower(lists:flatten([atom_to_list(Atom),"-",integer_to_list(Id,36)])).
+
+to_hex(Int) when is_integer(Int) -> integer_to_list(Int,36);
 to_hex([]) -> [];
 to_hex(Bin) when is_binary(Bin) -> to_hex(binary_to_list(Bin));
 to_hex([H|T]) -> [to_digit(H div 16), to_digit(H rem 16) | to_hex(T)].
@@ -149,3 +154,20 @@ merge_record(Table,NewRecord,Fields) ->
 index_of(_, [], _)  -> not_found;
 index_of(Item, [Item|_], Index) -> Index;
 index_of(Item, [_|Tl], Index) -> index_of(Item, Tl, Index+1).
+
+% <a(?!\ ?href\=\"https\:\/\/erlach\.ru\/[^\"]*\")[^>]*>([^<]*)<\/a>
+link_regexp() -> <<"<a(?!\\ ?href\\=\\\"https\\:\\/\\/erlach\\.ru\\/[^\\\"]*\\\")[^>]*>([^<]*)<\\/a>">>.
+img_regexp() -> <<"<img[^>]+\\>">>.
+% html_message(#post{markup=Markup,message=Message}) -> Message;
+html_message(#post{markup=Markup,message=Message,view=View}) ->
+    AsIs = proplists:get_value(as_is,View),
+    case Markup of
+        markdown ->
+            MD = guard:strip(markdown:conv_utf8(Message)),
+            if AsIs -> MD; true ->
+                re:replace(MD,<<"(",(link_regexp())/binary,")|(",(img_regexp())/binary,")">>,<<>>,[global,{return,binary}])
+                % re:replace(MD2,img_regexp(),<<>>,[global,{return,binary}])
+            end;
+        _ -> guard:html_escape(Message)
+    end;
+html_message(_) -> <<>>.
