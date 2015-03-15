@@ -34,6 +34,8 @@ function drag_input_init() {
     };
 };
 
+drag_input_init();
+
 function fileLoadFinished(pos) {
 	// var thumb = document.querySelectorAll("#thumbnail-list canvas")[pos];
 	// thumb.style.opacity = 1.0;

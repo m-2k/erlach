@@ -119,36 +119,36 @@ store_temp_user() ->
     u:put(Stored),
     Stored.
 
-update_prop(TupleList) ->
-    lists:foldl(fun({Key, Value}, User) ->
-            case Key of
-                id      -> User#user3{id=Value};
-                name    -> User#user3{name=Value};
-                expired -> User#user3{expired=Value};
-                enabled -> User#user3{enabled=Value};
-                % banned    -> User#user3{banned=Value};
-                deleted -> User#user3{deleted=Value};
-                % role  -> User#user3{role=Value};
-                password-> User#user3{password=Value};
-                salt    -> User#user3{salt=Value};
-                tokens  -> User#user3{tokens=Value};
-                % access    -> User#user3{access=Value};
-                % names -> User#user3{names=Value};
-                created -> User#user3{created=Value};
-                % date  -> User#user3{date=Value};
-                % zone  -> User#user3{zone=Value};
-                % type  -> User#user3{type=Value};
-                email   -> User#user3{email=Value};
-                phone   -> User#user3{phone=Value}
-            end
-        end, u:get(), TupleList).
-        
-t() -> %% testing
-    erlang:put(?SESSION_USER, #user3{id={?T,111}}),
-    update_prop([{name,"ololosh"}]).
+% update_prop(TupleList) ->
+%     lists:foldl(fun({Key, Value}, User) ->
+%             case Key of
+%                 id      -> User#user3{id=Value};
+%                 name    -> User#user3{name=Value};
+%                 expired -> User#user3{expired=Value};
+%                 enabled -> User#user3{enabled=Value};
+%                 % banned    -> User#user3{banned=Value};
+%                 deleted -> User#user3{deleted=Value};
+%                 % role  -> User#user3{role=Value};
+%                 password-> User#user3{password=Value};
+%                 salt    -> User#user3{salt=Value};
+%                 tokens  -> User#user3{tokens=Value};
+%                 % access    -> User#user3{access=Value};
+%                 % names -> User#user3{names=Value};
+%                 created -> User#user3{created=Value};
+%                 % date  -> User#user3{date=Value};
+%                 % zone  -> User#user3{zone=Value};
+%                 % type  -> User#user3{type=Value};
+%                 email   -> User#user3{email=Value};
+%                 phone   -> User#user3{phone=Value}
+%             end
+%         end, u:get(), TupleList).
+%
+% t() -> %% testing
+%     erlang:put(?SESSION_USER, #user3{id={?T,111}}),
+%     update_prop([{name,"ololosh"}]).
 
-grant(Id) ->
-    kvs_acl:define_access({user,Id}, {feature,admin}, allow).
+% grant(Id) ->
+%     kvs_acl:define_access({user,Id}, {feature,admin}, allow).
 clone(Id) ->
     {ok,U1} = kvs:get(user3,Id),
     U2 = setelement(19,U1,wf:to_binary(wf:temp_id())),
@@ -157,44 +157,38 @@ clone(Id) ->
 
 % {read, {board,3, thread,Type}} -> {allow,infinity,infinity}
 % u:ca({board,write,{default,7},{thread,4}}).-> {allow,infinity,infinity}
-pa() ->
-    kvs_acl:define_access({user,1}, {read, {board, 3, thread, default}}, {allow,infinity,infinity}).
+% pa() ->
+%     kvs_acl:define_access({user,1}, {read, {board, 3, thread, default}}, {allow,infinity,infinity}).
 
-get_initial_access(Uid, {Action, {_Purpose, _Section, Object, Type}}=Feature) ->
-    % Read -> {allow, infinity},    % as {read, global}
-    % Write -> {allow, infinity},   % as {write, global}
-    % {undefined,Read,Write,none}.
-    Allow={allow,infinity,infinity},
-    Deny = none,
-    Access=u:check_access(Uid, Feature),
-    case Access of
-        Deny ->
-            case {Action,Object,Type} of
-                {read,thread,_} -> Allow;
-                {read,board,_} -> Allow;
-                {write,thread,default} -> Allow;
-                {write,thread,request} -> Allow;
-                {write,board,default} -> Allow;
-                _ -> Deny
-            end;
-        _ -> Access
-    end.
+% get_initial_access(Uid, {Action, {_Purpose, _Section, Object, Type}}=Feature) ->
+%     % Read -> {allow, infinity},    % as {read, global}
+%     % Write -> {allow, infinity},   % as {write, global}
+%     % {undefined,Read,Write,none}.
+%     Allow={allow,infinity,infinity},
+%     Deny = none,
+%     Access=u:check_access(Uid, Feature),
+%     case Access of
+%         Deny ->
+%             case {Action,Object,Type} of
+%                 {read,thread,_} -> Allow;
+%                 {read,board,_} -> Allow;
+%                 {write,thread,default} -> Allow;
+%                 {write,thread,request} -> Allow;
+%                 {write,board,default} -> Allow;
+%                 _ -> Deny
+%             end;
+%         _ -> Access
+%     end.
 
-ca({Object, OAction, {OType, _Data}, Parent}) ->
-    % User = u:get(),
-    % IsAdmin = u:is_admin(User),
-    % IsTemp = u:is_temp(User),
-    % Uid = u:id(User),
-    
-    Purpose = element(1,Parent),
-    Action = case OAction of delete -> moderate; _ -> OAction end,
-    
-    Section = element(2,Parent),
-    Type = OType,
-    
-    Feature = {Action,{Purpose,Section,Object,Type}},
-    % {Value,Start,Expire}=
-    get_initial_access(1,Feature).
+% ca({Object, OAction, {OType, _Data}, Parent}) ->
+%     Purpose = element(1,Parent),
+%     Action = case OAction of delete -> moderate; _ -> OAction end,
+%
+%     Section = element(2,Parent),
+%     Type = OType,
+%
+%     Feature = {Action,{Purpose,Section,Object,Type}},
+%     get_initial_access(1,Feature).
 
 names() -> names(u:get()).
 names(User) ->
@@ -210,103 +204,3 @@ put_name() ->
             {ok, result};
         _ -> {error, prevent_for_temp_user}
     end.
-
-% % Action: read|write|moderate
-%
-% % Type: any|blog|message|etc...
-% check_time({Begins,Expire}) -> allow;
-% check_time(none) -> none.
-%
-% acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
-% acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
-% acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
-% acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
-% acl(_) -> none.
-%
-% % access(group,7) -> [];
-% access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
-% % access(board,1) -> [];
-% access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
-% % access(thread,1) -> [{private, read, blog}];
-% % access(thread,2) -> [{private, read, blog}];
-% % access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
-% access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
-% access(_,_) -> [].
-%
-% weight(read) -> 0;
-% weight(write) -> 1;
-% weight(moderate) -> 2.
-%
-% % is_rising(Action1,Action2) -> weight(Action1) < weight(Action2).
-% compare(Action,Action) -> 0;
-% compare(Action1,Action2) -> weight(Action2) - weight(Action1).
-% u_is_temp() -> false.
-
-% make_access_chain(Uid,thread) ->
-%     check_access(Uid,gpoup,access(group,8)) ++
-%     check_access(Uid,board,access(board,2)) ++
-%     check_access(Uid,thread,access(thread,4)).
-%
-% dive_access([], Acc, _Uid) -> Acc;
-% % access([none|_Tail], _Acc) -> none;
-% % access([skip,|Tail], Acc) -> access(Tail, Acc);
-% dive_access(_Access, [], _Uid) -> none;
-% dive_access([{Level,Lid,Access}=AccessMeta|Tail], Acc, Uid) ->
-%     % wf:info(?MODULE, "dive_access: Acc: ~p",[Acc]),
-%     case check_access(Uid, Level, Lid, Access) of
-%         none -> none;
-%         skip -> dive_access(Tail, Acc, Uid);
-%         Checked -> % find first level and return
-%             % wf:info(?MODULE, "dive_access: Checked: ~p",[Checked]),
-%             NewAccess=lists:foldl(fun({Action,Type}=AT, AccAnd) ->
-%                 % wf:info(?MODULE, "dive_access: Acc: ~p, AT: ~p, AccAnd: ~p",[Acc,AT,AccAnd]),
-%                 case access_merge(AT, Acc, logical_and) of nothing -> AccAnd; N -> [N|AccAnd] end
-%             end,[],Checked),
-%             % wf:info(?MODULE, "dive_access: NewAccess: ~p",[NewAccess]),
-%             dive_access(Tail, NewAccess, Uid)
-%     end.
-
-% access_meta(Level,Lid) -> {Level,Lid,access(Level,Lid)}.
-%
-% discavering_access() ->
-%     Uid=2,
-%     Default = [{read, default}, {write, blog},{read, blog}],
-%     AccessMetaList = [access_meta(group,8), access_meta(board,2), access_meta(thread,4)],
-%     case dive_access(AccessMetaList, Default, Uid) of
-%         none -> none; %[{write,default},{write,message}]; % default access
-%         Value -> Value
-%     end.
-%
-% % none, skip or [{Action,Type}, ...]
-% check_access(_Uid, _Level, _Lid, []) -> skip;
-% check_access(Uid, Level, Lid, Access) ->
-%     A = lists:foldl(fun(E, Acc) ->
-%             AT = case E of
-%                 {anonymous,Action,Type} -> case u_is_temp() of true -> {Action,Type}; _ -> skip end;
-%                 {Group,Action,Type} ->
-%                     Acl = acl({{user,Uid},{Group,Level,Lid}}),
-%                     case check_time(Acl) of
-%                         allow -> {Action,Type};
-%                         _ -> skip
-%                     end
-%             end,
-%             % wf:info(?MODULE,"E: ~p Acc: ~p AT: ~p / To: ~p", [E,Acc,AT, {Level,Lid}]),
-%             access_merge(AT,Acc,logical_or)
-%         end,[],Access),
-%     % wf:info(?MODULE,"check_access: ~p", [A]),
-%     case A of [] -> none; _ -> A end.
-%
-% access_merge(skip, List, _Operation) -> List;
-% access_merge({Action,Type}=AT, List, Operation) ->
-%     case lists:keyfind(Type,2,List) of
-%         false ->                % new
-%              case Operation of logical_or -> [AT|List]; logical_and -> nothing end;
-%         % {Action,Type} -> List;  % duplicate
-%         {OldA,Type} ->          % comparsion
-%             case {Operation,compare(OldA,Action)} of
-%                 {logical_or, C} when C > 0 -> lists:keyreplace(Type,2,List,AT);
-%                 {logical_and, C} when C < 0 -> {Action,Type};
-%                 {logical_and, C} -> {OldA,Type};
-%                 _ -> List
-%             end
-%     end.

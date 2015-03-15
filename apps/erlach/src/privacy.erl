@@ -18,16 +18,17 @@
 
 -define(PRIVACY_POST_ID, 10).
 -define(PRIVACY_THREAD_ID, 6).
+-define(PRIVACY_BOARD_URI, e).
 
 main() -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"glassy privacy">>}, {title,<<"Privacy">>}]}.
 body() ->
     Content = case kvs:get(post, ?PRIVACY_POST_ID) of
         {ok, Post} ->
             {ok, Html} = html:post(Post),
-            [ #panel{class= <<"content-title">>,body= <<"Privacy">>},
+            [ #panel{class= <<"content-title">>,body= <<"Privacy2">>},
                 #panel{id=posts,body=[Html]},
                 #panel{class= <<"center">>,body=[
-                    #link{class= <<"button primary">>, href=qs:ml({thread,?PRIVACY_THREAD_ID}), body= <<"View thread">>}
+                    #link{class= <<"button primary">>, href=qs:ml({thread,?PRIVACY_BOARD_URI,?PRIVACY_THREAD_ID}), body= <<"View thread">>}
                     ]} ];
         _ -> []
     end,

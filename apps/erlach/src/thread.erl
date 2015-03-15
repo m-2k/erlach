@@ -34,12 +34,13 @@ body({Access, _Board, _Thread, _Action}=Data) ->
         {title,html:title(?MODULE,Data)}]}.
 
 init_state() ->
-     % wf:info(?MODULE,"Test ~p",[init_state]),
-     
-     wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
-     #{i := Id, e := Extra} = erlang:get(matched_qs),
-     
-    case {guard:to_integer(Id,?IDS_BASE),?SESSION:get_param(?MODULE)} of
+    % wf:info(?MODULE,"Test ~p",[init_state]),
+    
+    % wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
+    % #{thread := RouteT, board := _RouteB} = erlang:get(matched_qs),
+    Route=?CTX#cx.path,
+    
+    case {guard:to_integer(Route#route.thread,?IDS_BASE),?SESSION:get_param(?MODULE)} of
         {Tid, _} when Tid =/= undefined -> % view thread
             check_access_to_thread(Tid,{thread, view, Tid});
         {_, {thread, create, {request, {board, Bid}}}=Action} -> % new thread (request)
@@ -116,9 +117,9 @@ event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
             wf:info(?MODULE,"Final storing -sending",[]),
             wf:send({thread,T#thread.id},{server, {add, post, P, self()}}),
             case erlang:get(action) of
-                {thread,create,{request, _}} -> wf:redirect(qs:ml({thread,T#thread.id}));
-                {thread,create,{blog,_}} -> wf:redirect(qs:ml({board,blog,B#board.id}));
-                {thread,create,_} -> wf:redirect(qs:ml({board,B#board.id}));
+                {thread,create,{request, _}} -> wf:redirect(qs:ml({thread,B#board.uri,T#thread.id}));
+                {thread,create,{blog,_}} -> wf:redirect(qs:ml({board,blog,B#board.uri}));
+                {thread,create,_} -> wf:redirect(qs:ml({board,B#board.uri}));
                 _ ->
                     wf:info(?MODULE,"Final storing -wiring",[]),
                     wf:wire("publish_finished();"),
@@ -150,7 +151,7 @@ event({server,{add, post, #post{id=Pid}=Post, Self}}) ->
             Newest=erlang:get(?NEWEST_POSTS),
             case Newest of
                 [] -> wf:insert_bottom(posts,#panel{id=more,class= <<"center">>,body=[
-                    #link{class= <<"button success">>,body= <<"Load More">>,postback=load_newest_posts}]});
+                    #link{class= <<"button success">>,body= <<"Load More ⟳"/utf8>>,postback=load_newest_posts}]});
                 _ -> ok end,
             erlang:put(?NEWEST_POSTS,[Pid|Newest]),
             wf:info(?MODULE, "NEWEST_POSTS: ~p",[erlang:get(?NEWEST_POSTS)])
@@ -166,24 +167,24 @@ event(load_newest_posts) ->
 
 event({hide_post, Id}) ->
     wf:info(?MODULE, "Hiding post: ~p", [Id]),
-    u:restricted_call(fun() ->
+    % u:restricted_call(fun() ->
         case kvs:get(post, Id) of
             {ok, Post} ->
                 kvs:put(Post#post{deleted=true});
             Err -> wf:error(?MODULE, "Hiding post failed ~p", [Err])
         end,
-        update_post(Id)
-    end, {feature, admin});
+        update_post(Id);
+    % end, {feature, admin});
 event({show_post, Id}) ->
     wf:info(?MODULE, "Showing post: ~p", [Id]),
-    u:restricted_call(fun() ->
+    % u:restricted_call(fun() ->
         case kvs:get(post, Id) of
             {ok, Post} ->
                 kvs:put(Post#post{deleted=undefined});
             Err -> wf:error(?MODULE, "Showing post failed ~p", [Err])
         end,
-        update_post(Id)
-    end, {feature, admin});
+        update_post(Id);
+    % end, {feature, admin});
 event({edit_post,Id}) ->
     wf:info(?MODULE, "Edit post: ~p", [Id]),
     Post=message({restore,Id}),

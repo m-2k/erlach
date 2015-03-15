@@ -77,7 +77,8 @@ add_new_board(Uri, Name, Description, GroupID, Hidden) ->
         user=0,
         description=Description,
         hidden=Hidden,
-        feed_id={board, GroupID}
+        feed_id={board, GroupID},
+        access=access:default_access(board)
         }).
 
 add_name(Uid,Name) ->
@@ -171,3 +172,17 @@ html_message(#post{markup=Markup,message=Message,view=View}) ->
         _ -> guard:html_escape(Message)
     end;
 html_message(_) -> <<>>.
+
+
+expired(Timestamp,TTL) ->
+    NowSec = calendar:datetime_to_gregorian_seconds(calendar:local_time()),
+    ExpireSec = calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Timestamp)) + TTL,
+    NowSec > ExpireSec.
+
+online() -> [X||X<-qlc:e(gproc:table()),element(1,X)=={p,l,broadcast}].
+online2() -> ets:select(gproc,[{{{{'$1','$2','$3'},'$4'},'$5','$6'},[{'=:=',broadcast,'$3'},{'=:=',p,'$1'},{'=:=',l,'$2'}],['$$']}]).
+online3() -> gproc:select({local,all},[{'_',[],['$$']}]).
+
+-include_lib("stdlib/include/ms_transform.hrl").
+online4() -> ets:select(gproc,ets:fun2ms(fun({{{_,_,broadcast},_},D,E}) -> {D,E} end)).
+online5() -> ets:select_count(gproc,ets:fun2ms(fun({{{_,_,broadcast},_},D,E}) -> true end)).

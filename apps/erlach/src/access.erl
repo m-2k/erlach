@@ -1,11 +1,21 @@
 -module(access).
 % -compile(export_all).
--export([meta/1, discavering/2, lookup/2, is_allow/3, define/2, define/6, restrict/2, acl/1]).
+-export([ meta/1,
+          discavering/2,
+          lookup/2,
+          is_allow/3,
+          define/2,
+          define/6,
+          % restrict/2,
+          acl/1,
+          default_access/1,
+          update_elements_access_list/1]).
 
 % Модель защиты – это всегда эффективная функция проверки check к двум множествам: списку доступа объекта и списку возможностей пользователя
 
 -include_lib("db/include/board.hrl").
 -include_lib("db/include/thread.hrl").
+-include_lib("db/include/db.hrl").
 -include("erlach.hrl").
 
 % -ifndef(SESSION).
@@ -14,6 +24,34 @@
 
 -define(DEFAULT_ACCESS_RULES, [{write,post},{write,blog},{write,thread},{write,message},{read,request}]).
 -define(FULL_ACCESS_RULES, [{moderate,post},{moderate,blog},{moderate,thread},{moderate,message},{moderate,request}]).
+
+default_access(board) -> [
+    {anonymous,  write, post},
+    {anonymous,  read,  blog},
+    {anonymous,  write, thread},
+    {anonymous,  write, message},
+    {anonymous,  read,  request},
+    {registered, write, post},
+    {registered, read,  blog},
+    {registered, write, thread},
+    {registered, write, message},
+    {registered, read,  request},
+    {private,    write, post},
+    {private,    read,  blog},
+    {private,    write, thread},
+    {private,    write, message},
+    {private,    read,  request},
+    {moderator,  moderate, post},
+    {moderator,  moderate, blog},
+    {moderator,  moderate, thread},
+    {moderator,  moderate, message},
+    {moderator,  moderate, request}
+    ];
+default_access(_) -> [].
+
+% redefining default #db_element.access for tables in db
+update_elements_access_list(Table) ->
+    lists:foreach(fun(E) -> E2=setelement(#db_element.access,E,default_access(Table)), kvs:put(E2) end, kvs:all(Table)).
 
 % Action: read|write|moderate
 
@@ -29,34 +67,27 @@ define(Uid,#thread{id=Tid}) -> define(Uid,private,thread,Tid,infinity,infinity).
 define(Uid,Group,Level,Lid,Begins,Expire) ->
     kvs_acl:define_access({user,Uid}, {Group,Level,Lid}, {Begins,Expire}).
     
-restrict(Table,Id) ->
-    {ok, E} = kvs:get(Table,Id),
-    E2 = case E of
-        #thread{}=T -> T#thread{access=[{anonymous, read, blog},{private, write, blog}]};
-        #board{}=B -> B#board{access=[{anonymous, read, blog},{private, write, blog}]}
-    end,
-    kvs:put(E2).
+% restrict(Table,Id) ->
+%     {ok, E} = kvs:get(Table,Id),
+%     E2 = case E of
+%         #thread{}=T -> T#thread{access=[{anonymous, read, blog},{private, write, blog}]};
+%         #board{}=B -> B#board{access=[{anonymous, read, blog},{private, write, blog}]}
+%     end,
+%     kvs:put(E2).
 
-acl({{user,1}, {private,board,1}}) -> {infinity,infinity};
-acl({{user,1}, {private,board,6}}) -> {infinity,infinity};
-acl({{user,1}, {private,thread,10}}) -> {infinity,infinity};
-
+acl({{user,_}, {anonymous,_,_}}) -> {infinity,infinity};
+acl({{user,1}, {moderator,board,1}}) -> {infinity,infinity};
+acl({{user,1}, {moderator,board,4}}) -> {infinity,infinity};
+acl({{user,1}, {moderator,thread,2}}) -> {infinity,infinity};
+% acl({{user,1}, {private,board,1}}) -> {infinity,infinity};
+% acl({{user,1}, {private,board,6}}) -> {infinity,infinity};
+% acl({{user,1}, {private,thread,10}}) -> {infinity,infinity};
 % acl({{user,2}, {private,global,undefined}}) -> {infinity,infinity}; % for root access
 % acl({{user,2}, {private,board,2}}) -> {infinity,infinity};
 % acl({{user,2}, {private,thread,4}}) -> {infinity,infinity};
 % acl({{user,2}, {private,group,8}}) -> {infinity,infinity};
 % acl(_) -> none.
 acl(Key) -> kvs_acl:check([ Key ]).
-
-% % access(group,7) -> [];
-% access(group,8) -> [{anonymous, read, blog},{private, write, blog}];
-% % access(board,1) -> [];
-% access(board,2) -> [{anonymous, read, blog},{private, read, blog}];
-% % access(thread,1) -> [{private, read, blog}];
-% % access(thread,2) -> [{private, read, blog}];
-% % access(thread,3) -> [{private2, write, blog},{private, write, blog},{private, write, blog},{anonymous, read, default}];
-% access(thread,4) -> [{anonymous, read, default}, {private, write, blog},{private, read, blog}];
-% access(_,_) -> [].
 
 weight(nothing) -> 0;
 weight(read) -> 1;
@@ -76,7 +107,7 @@ meta(#thread{id=Id,access=Access}) -> {thread,Id,Access}.
 % t() -> discavering(2, [meta(group,8), meta(board,2), meta(thread,4)]).
 
 discavering(User, AccessMetaList) ->
-    case dive_access(AccessMetaList, ?DEFAULT_ACCESS_RULES, u:to_id(User)) of
+    case dive_access(AccessMetaList, ?FULL_ACCESS_RULES, u:to_id(User)) of
         none -> []; % {error, access_denied};
         Value -> Value % {ok, Value}
     end.

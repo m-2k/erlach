@@ -51,13 +51,13 @@ body({Access, _Board, _Thread, _Action}=Data) ->
 init_state() ->
     % Id = guard:to_integer(wf:qs(<<"id">>)),
     % Id = guard:to_integer(erlang:get(sasay)),
-    wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
-    #{i := Id, e := Extra} = erlang:get(matched_qs),
+    % wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
+    % #{board := Id} = erlang:get(matched_qs),
+    Route=?CTX#cx.path,
     
-    
-    case {guard:to_integer(Id,?IDS_BASE),?SESSION:get_param(?MODULE)} of
+    case {qs:board_uri_to_id(Route#route.board),?SESSION:get_param(?MODULE)} of
         {Bid, _} when Bid =/= undefined -> % view thread
-            Type=case Extra of <<"blog">> -> blog; _ -> thread end,
+            Type=case Route#route.type of <<"blog">> -> blog; _ -> thread end,
             thread:check_access_to_board(Bid,{board,view,{Type,Bid}});
         % {_, {thread, create, {request, {board, Bid}}}=Action} -> % new thread (request)
         %     check_access_to_board(Bid,Action);
@@ -74,7 +74,8 @@ event({thread, create, Type}=S) ->
         % case guard:to_integer(wf:qs(<<"id">>)) of
             % undefined -> skip;
             % Bid ->
-            ?SESSION:set_param(thread, {thread, create, Type}), wf:redirect(qs:ml({thread,create}));
+            #board{uri=Uri}=erlang:get(board),
+            ?SESSION:set_param(thread, {thread, create, Type}), wf:redirect(qs:ml({thread,create,Uri}));
         % end;
         % end end, {feature, admin});
 event({apply_board, BID}) ->

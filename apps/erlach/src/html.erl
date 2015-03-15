@@ -163,7 +163,7 @@ post_check_visibility(Uid,IsModerate,#thread{type=ThType,request_to=ReqTo},#post
 post(#post{feed_id={post,Tid}}=P) ->
     {ok, Thread} = kvs:get(thread,Tid),
     post(Thread,P, u:is_admin(),u:id(),erlang:get(access)).
-post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,_Access) ->
+post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,Access) ->
 
     % wf:info(?MODULE, " >>> html_post Message: ~p", [Message]),
     
@@ -171,6 +171,11 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
     % {{_Y,_M,_D},{Hour,Minute,Second}} = calendar:now_to_local_time(Timestamp),
     Text = utils:html_message(Post),
     % wf:info(?MODULE, " >>> html_post Converted message: ~p", [Text]),
+    
+    IsSelfPost = User =:= Uid,
+    CanDelete = IsSelfPost orelse access:is_allow(message,moderate,Access),
+    CanRestore = access:is_allow(message,moderate,Access),
+    CanEdit = IsSelfPost andalso not utils:expired(Timestamp,config:expire_time_to_edit_messages()),
 
     Uid = u:id(),
     % wf:warning(?MODULE,"~n~n uids: ~p ~p",[Tu,User]),
@@ -184,12 +189,12 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
             Html = #panel { id = utils:hex_id({post,Id}), class = Class, body = [
                 % #panel{ class = <<"timestamp">>, body = guard:html_escape(wf:f("~2w:~2..0w:~2..0w", [Hour, Minute,Second])) },
                 % #panel{ class = <<"right-side">>, body = [
-                    case {IsAdmin, IsHead} of
-                        {true, true} -> #button{ class = <<"warning">>, body = <<"Hide thread">>, postback = {hide_thread, Tid} };
-                        {true, _} -> #button{ class = <<"warning">>, body = <<"Hide">>, postback = {hide_post, Id} };
+                    case {CanDelete, IsHead} of
+                        {true, true} -> #link{ class = <<"button danger slim">>, body = <<"Delete thread">>, postback = {hide_thread, Tid} };
+                        {true, _} -> #link{ class = <<"button danger slim">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
                         _ -> [] end,
-                    case (not u:is_temp(Uid)) andalso User =:= Uid of true -> html:error(wf:to_list(Id)),
-                        #button{ class = <<"warning">>, body = <<"Edit">>, postback = {edit_post, Id} }; _ -> [] end,
+                    case CanEdit of true -> %html:error(wf:to_list(Id)),
+                        #link{ class = <<"button info slim">>, body = <<"✎"/utf8>>, postback = {edit_post, Id} }; _ -> [] end,
                     case ThreadType of
                         request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
                             
@@ -214,12 +219,12 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
                 ]},
             {ok, Html};
         {ok,_} ->
-            case IsAdmin of
+            case CanRestore of
                 true ->
                     Html = #panel { id = utils:hex_id({post,Id}), class = <<"thread-post">>, body = [
                             case IsHead of
-                                true -> #button{ class = <<"success">>, body = <<"Show thread">>, postback = {show_thread, Tid} };
-                                _ -> #button{ class = <<"success">>, body = <<"Show">>, postback = {show_post, Id} }
+                                true -> #link{ class = <<"button success slim">>, body = <<"Restore thread">>, postback = {show_thread, Tid} };
+                                _ -> #link{ class = <<"button success slim">>, body = <<"⟳"/utf8>>, postback = {show_post, Id} }
                             end,
                             case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
                                 anonymous -> <<"anonymous">>;
@@ -258,11 +263,12 @@ board_body_private({Access, Board, Thread, {board, Action, Data}}=S) ->
                 #span{class= <<"content-title">>, body= <<"The board only for the elect">>},
                 case Board#board.request_thread of
                     undefined -> [];
-                    Tid -> #link{class= <<"button success">>, body= <<"Make request for access to this board">>,url=qs:ml({thread, Tid}) }
+                    Tid -> #link{class= <<"button success">>, body= <<"Make request for access to this board">>,
+                        url=qs:ml({thread, Board#board.uri, Tid}) }
                 end ]})
     end.
 
-board_body({Access, #board{id=Bid,name=Name,description=Description}=Board, Thread, {board, Action, Data}}=S) ->
+board_body({Access, #board{id=Bid,uri=Uri,name=Name,description=Description}=Board, Thread, {board, Action, Data}}=S) ->
     
     case config:debug() of true -> html:info("ACCESS: " ++ wf:to_list(Access)); _ -> ok end,
     
@@ -273,16 +279,16 @@ board_body({Access, #board{id=Bid,name=Name,description=Description}=Board, Thre
     Head = [ #panel{class= <<"content-title">>,body=Name}, #span{class= <<"remark">>,body=Description} ],
     Manage = #panel{class= <<"center">>,body=[
         case Data of
-            {thread, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Blog">>, href=qs:ml({board,blog,Bid}) },
+            {thread, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Blog">>, href=qs:ml({board,blog,Uri}) },
                 if AllowMessage -> #link{class = <<"button primary slim">>, body = <<"New">>, postback={thread, create, {thread, Bid}} }; true -> [] end ];
-            {blog, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Threads">>, href=qs:ml({board,Bid}) },
+            {blog, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Threads">>, href=qs:ml({board,Uri}) },
                 if AllowBlog -> #link{class = <<"button primary slim">>, body = <<"New blog">>, postback={thread, create, {blog, Bid}} }; true -> [] end ]
         end,
         
         if AllowRequest ->
                 case Board#board.request_thread of
                     undefined -> #link{class= <<"button info slim">>, body= <<"New request">>,postback={thread, create, {request, {board, Bid}}}};
-                    Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,Rtid}) }
+                    Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,Uri,Rtid}) }
                 end; true -> [] end ]},
     Main = #panel{id= <<"threads">>, class= <<"line">>, body=board_content(S)},
     Settings = case u:is_admin() of true -> settings_panel(board, Board); _ -> [] end,
@@ -315,7 +321,7 @@ board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) -
                 {blog, _Bid} -> #panel{ body = [
                         % #span{ body = wf:f("Blog count: ~p, Thread count: ~p", [length(HeadBlogList2),length(HeadPostList3)])},
                         % html_blog(HeadBlogList2),
-                        lists:map(fun({T,P}) -> html_thread(T,P) end, lists:reverse(HeadBlogList2))
+                        lists:map(fun({T,P}) -> html_thread(Board,T,P) end, lists:reverse(HeadBlogList2))
                     ]};
                 {thread, _Bid} ->
                     % Bump sorting TODO: inject thread-element to top in feed when post written
@@ -324,13 +330,13 @@ board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) -
                     #panel{ body = [
                         % #span{ body = wf:f("Blog count: ~p, Thread count: ~p", [length(HeadBlogList2),length(HeadPostList3)])},
                         % html_blog(HeadBlogList2),
-                        lists:map(fun({_LastTimestamp,T,P}) -> html_thread(T,P) end, SortedPostList)
+                        lists:map(fun({_LastTimestamp,T,P}) -> html_thread(Board,T,P) end, SortedPostList)
                     ]}
             end;
         _Empty -> []
     end.
 
-html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,head=IsHead,markup=Markup}=Post) ->
+html_thread(#board{uri=Uri},#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,head=IsHead,markup=Markup}=Post) ->
     
     IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
     Class = case IsBlog of true -> <<"board-blog">>; _ -> <<"board-thread">> end,
@@ -340,7 +346,7 @@ html_thread(#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Mess
             #panel{class= <<"thread-topic">>,body=[
                 #link{class= <<"link">>,
                     body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
-                    href=qs:ml({thread,Id})}
+                    href=qs:ml({thread,Uri,Id})}
             ]},
             case IsBlog of true -> []; _ -> #span{class= <<"username">>,body= <<"anonymous">>} end,
             #span{class= <<"message">>,body=Text},

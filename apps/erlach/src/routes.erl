@@ -3,6 +3,8 @@
 -include_lib("n2o/include/wf.hrl").
 -export([init/2, finish/2]).
 
+-include("erlach.hrl").
+
 %% U can use default dynamic routes or define custom static as this
 %% Just put needed module name to sys.config:
 %% {n2o, [{route,routes}]}
@@ -11,14 +13,26 @@
 
 finish(State, Ctx) -> {ok, State, Ctx}.
 init(State, Ctx) -> 
-    Path = wf:path(Ctx#cx.req),
+    % Path = wf:path(Ctx#cx.req),
+    % wf:info(?MODULE,"ROUTE path: ~p",[Ctx#cx.path]),
     
-    Map = qs:parse_qs(Ctx#cx.req),
-    % wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
-    
-    wf:info(?MODULE,"Route: ~p~n",[Path]),
-    % {ok, State, Ctx#cx{path=Path,module=route_prefix(Path,F,S)}}.
-    {ok, State, Ctx#cx{path=Path,module=route(maps:get(m,Map,<<>>))}}.
+    % Route = case erlang:erase(route) of
+    %     undefined ->
+            R = qs:parse_qs(Ctx#cx.req),
+            Module = case route(R#route.board) of
+                undefined ->
+                    case R#route.new of undefined ->
+                        case R#route.thread of undefined -> board; _ -> thread end;
+                        _ -> thread
+                    end;
+                M -> M end,
+            R2=R#route{module=Module},
+    %         wf:wire(#transfer{state=[{route,R2}]}),
+    %         R2;
+    %     Exist -> Exist
+    % end,
+    wf:info(?MODULE,"Route: ~p ~p~n",[self(),R2]),
+    {ok, State, Ctx#cx{path=R2,module=R2#route.module}}.
 
 % route_prefix(<<"/ws/",P/binary>>,F,S) -> route(P,F,S);
 % route_prefix(<<"/",P/binary>>,F,S) -> route(P,F,S);
@@ -39,7 +53,7 @@ route(undefined)         -> root;
 route(<<"privacy">>)     -> privacy;
 route(<<"donate">>)      -> donate;
 route(<<"profile">>)     -> profile;
-route(<<"board">>)       -> board;
-route(<<"thread">>)      -> thread;
+% route(<<"board">>)       -> board;
+route(<<"new">>)      -> thread;
 route(<<"favicon.ico">>) -> static_file;
-route(_) -> root.
+route(_) -> undefined.

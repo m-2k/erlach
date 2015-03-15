@@ -26,7 +26,7 @@ body() ->
         ]},
     Html = lists:map(fun(#board{ id=Id, uri=Uri, name=Name }) ->
         #panel{ class = <<"board">>, body = [
-            #link{ class= <<"button girl alpha">>, href = qs:ml({board,Id}), body = [
+            #link{ class= <<"button girl alpha">>, href = qs:ml({board,Uri}), body = [
                 #span{class= <<>>,body=wf:f("~s", [Uri])},
                 wf:html_encode(wf:f(" - ~s", [Name]))] }
         ]} end, lists:reverse(Boards)),

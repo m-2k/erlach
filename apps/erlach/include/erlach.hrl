@@ -1,4 +1,4 @@
--define(ERLACH_VERSION, <<"0.2 beta">>).
+-define(ERLACH_VERSION, <<"2.2 beta">>).
 
 % -define(BOARD_ID, board_id).
 % -define(THREAD_ID, thread_id).
@@ -26,7 +26,7 @@
 -define(MIME_IMAGE_BPG,  {<<"image/bpg">>,  <<"bpg">>}).
 
 -define(UPLOAD_MIN_SIZE, 100).
--define(UPLOAD_MAX_SIZE, 1048576). % 1MB
+-define(UPLOAD_MAX_SIZE, 10485760). % 10MB
 % -define(UPLOAD_MAX_SIZE, 102400). % 100KB
 
 -define(SITE_NAME, <<"Erlach">>).
@@ -36,3 +36,5 @@
 -define(ACTION_API, {Access, Board, Thread, {Level, Action, Data}}).
 
 -define(IDS_BASE, 36).
+
+-record(route,{module,board,type,thread,category,new}).
