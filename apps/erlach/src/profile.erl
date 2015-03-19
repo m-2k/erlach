@@ -24,7 +24,8 @@ main()    -> % wf:redirect({http,<<"/sasay">>}).
 
 body() ->
     Content = case ?SESSION:erase_param(?MODULE) of
-        signin -> #button{body= <<"Auth with Twitter">>, class = <<"success center">>, postback={twitter,logintwitter}};
+        signin -> #panel{class= <<"center">>,body=#link{body= <<"Auth with Twitter">>,
+            class= <<"button success">>, postback={twitter,logintwitter}} };
         _ ->
             User = u:get(),
             Title = case u:is_temp(User) of

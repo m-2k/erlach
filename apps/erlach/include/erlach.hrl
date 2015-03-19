@@ -37,4 +37,10 @@
 
 -define(IDS_BASE, 36).
 
--record(route,{module,board,type,thread,category,new}).
+-record(route, {
+    module :: atom(),
+    board,
+    type :: blog|thread,
+    thread,
+    category
+    }).

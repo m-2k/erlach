@@ -19,7 +19,8 @@
     name,
 	view = [] :: list(),
 	count,			% count of entry elements
-    links = [],
+    links = [] :: list(),
+    category = [] :: list(), % uses as "allowed categories" for boards & "selected categories" for threads
 	tags = [] :: list(),		% tag names
 	future = []).		% extends fields for future
 

@@ -14,8 +14,8 @@ log_modules() ->
         % n2o_dynroute,
         % n2o_nitrogen,
         % root,
-        % board,
-        % thread,
+        board,
+        thread,
         % profile,
         % % js_session2,
         % % erlach_session,
@@ -30,7 +30,7 @@ log_modules() ->
         % image,
         % utils,
         % u,
-        % html,
+        html,
         % access,
         routes,
         % guard,
@@ -41,7 +41,7 @@ log_modules() ->
 log_level() -> info.
 
 % debug() -> false.
-debug() -> true.
+debug() -> false.
 
 info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).
 

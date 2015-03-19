@@ -57,8 +57,8 @@ init_state() ->
     
     case {qs:board_uri_to_id(Route#route.board),?SESSION:get_param(?MODULE)} of
         {Bid, _} when Bid =/= undefined -> % view thread
-            Type=case Route#route.type of <<"blog">> -> blog; _ -> thread end,
-            thread:check_access_to_board(Bid,{board,view,{Type,Bid}});
+            % Type=case Route#route.type of <<"blog">> -> blog; _ -> thread end,
+            thread:check_access_to_board(Bid,{board,view,{Route#route.type,Bid}});
         % {_, {thread, create, {request, {board, Bid}}}=Action} -> % new thread (request)
         %     check_access_to_board(Bid,Action);
         % {_, {thread, create, {post, Bid}}=Action} -> % new thread

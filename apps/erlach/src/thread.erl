@@ -130,7 +130,8 @@ event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
                         wf:update(html:input_form_id(),HtmlPost),
                         ?JS_IMAGE_LIST_CHANGED_LESTENER,
                         wf:info(?MODULE,"Final storing -img update",[]),
-                        wf:insert_after(posts,html:input_form(view,erlang:get(access)));
+                        S={erlang:get(access),erlang:get(board),erlang:get(thread),erlang:get(action)},
+                        wf:insert_after(posts,html:input_form(S));
                     true -> add_post(P) end end
             % {ok,_}=message(finalize)
     end;
@@ -188,9 +189,16 @@ event({show_post, Id}) ->
 event({edit_post,Id}) ->
     wf:info(?MODULE, "Edit post: ~p", [Id]),
     Post=message({restore,Id}),
+    wf:info(?MODULE, "Edit post: ~p", [0]),
     wf:remove(html:input_form_id()),
-    wf:update(utils:hex_id({post,Id}),html:input_form(edit,erlang:get(access))),
-    wf:wire("textarea_init(qi(\"message\"));drag_input_init();");
+    wf:info(?MODULE, "Edit post: ~p", [1]),
+    S={erlang:get(access),erlang:get(board),erlang:get(thread),{post,edit,Id}},
+    wf:info(?MODULE, "Edit post: ~p", ['1a']),
+    wf:update(utils:hex_id({post,Id}),html:input_form(S)),
+    wf:info(?MODULE, "Edit post: ~p", [2]),
+    wf:wire("textarea_init(qi(\"message\"));drag_input_init();"),
+    wf:info(?MODULE, "Edit post: ~p", [3]),
+    wf:info(?MODULE, "Edit post: ~p", [4]);
 event(enable_markdown) ->
     % u:restricted_call(fun() ->
         wf:update(markdown,#link{id=markdown,class= <<"button warning">>,body= <<"Disable Markdown">>,postback=disable_markdown}),
@@ -347,19 +355,26 @@ thread(finalize) ->
     T = thread(store),
     Uname=html:name_selector_extract(wf:q(name_selector)), % only for create
     case erlang:get(action) of
-        {thread, create, {request=Type, {board=Level, Lid}}} ->
-            {ok,E}=kvs:get(Level,Lid),
-            E2 = setelement(#db_element.request_thread,E,T#thread.id),
-            kvs:put(E2),
-            T2 = T#thread{request_to={Level,Lid}, type=Type, temporary=false, user_name=Uname},
-            kvs:put(T2),
+        % {thread, create, {request=Type, {board=Level, Lid}}} ->
+        %     {ok,E}=kvs:get(Level,Lid),
+        %     E2 = setelement(#db_element.request_thread,E,T#thread.id),
+        %     kvs:put(E2),
+        %     T2 = T#thread{request_to={Level,Lid}, type=Type, temporary=false, user_name=Uname},
+        %     kvs:put(T2),
+        %     erlang:erase(thread),
+        %     {ok, T2};
+        {thread,create,{Type,To}} ->
+            T2=case {Type,To} of
+                {request, {board=Level, Lid}} ->
+                    {ok,E}=kvs:get(Level,Lid),
+                    E2 = setelement(#db_element.request_thread,E,T#thread.id),
+                    kvs:put(E2),
+                    T#thread{request_to={Level,Lid}};
+                _ -> T end,
+            T3 = T2#thread{ type=Type, temporary=false, user_name=Uname, category=html:categories_extract(erlang:get(board)) },
+            kvs:put(T3),
             erlang:erase(thread),
-            {ok, T2};
-        {thread,create,{Type,_}} ->
-            T2 = T#thread{ type=Type, temporary=false, user_name=Uname },
-            kvs:put(T2),
-            erlang:erase(thread),
-            {ok, T2};
+            {ok, T3};
         _ -> {ok, T} end.
 
 message(create) ->

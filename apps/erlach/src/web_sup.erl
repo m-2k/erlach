@@ -24,6 +24,7 @@ init([]) ->
         X -> io:format("Unknown Error: ~p\r\n",[X]), halt(abort,[]) end,
 
     kvs:join(),
+    qs:init(),
     % case kvs:get(board,1) of {ok, _} -> ok; _ -> utils:init_db() end,
 	
 	% start_child(image),
@@ -54,11 +55,15 @@ dispatch_rules() ->
             
             % {"/ws/[...]", bullet_handler, [{handler, n2o_bullet}]},
             
-            {"/ws/[:board/[:type/[:thread/[:category]]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}],bullet_handler, [{handler, n2o_bullet}]},
-            {"/ws/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], bullet_handler, [{handler, n2o_bullet}]},
-            {"/ws/[:board/[:thread/[:category]]]", bullet_handler, [{handler, n2o_bullet}]},
+            % {"/ws/[:board/[:type/[:thread/[:category]]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}],bullet_handler, [{handler, n2o_bullet}]},
+            % {"/ws/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], bullet_handler, [{handler, n2o_bullet}]},
+            % {"/ws/[:board/[:thread/[:category]]]", bullet_handler, [{handler, n2o_bullet}]},
+            %
+            % {"/[:board/[:type/[:thread/]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}], n2o_cowboy, []},
+            % {"/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], n2o_cowboy, []},
+            % {"/[:board/[:thread/[:category]]]", n2o_cowboy, []}
             
-            {"/[:board/[:type/[:thread/[:category]]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}], n2o_cowboy, []},
-            {"/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], n2o_cowboy, []},
-            {"/[:board/[:thread/[:category]]]", n2o_cowboy, []}
+            {"/ws/[:q1/[:q2/[:q3]]]", bullet_handler, [{handler, n2o_bullet}]},
+            {"/[:q1/[:q2/[:q3]]]", n2o_cowboy, []}
+            
         ]}]).

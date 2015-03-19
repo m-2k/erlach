@@ -8,29 +8,40 @@
 -include_lib("db/include/post.hrl").
 -include_lib("db/include/attachment.hrl").
 
+-include_lib("db/include/group.hrl").
 -include_lib("db/include/board.hrl").
 -include_lib("db/include/user.hrl").
 -include("erlach.hrl").
 
 main() -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"glassy">>}, {title,<<"Erlach">>}]}.
-body() ->
-    Boards = case kvs:get(feed, {board,1}) of
-        {ok,Bf} ->
-            kvs:traversal(board, Bf#feed.top, Bf#feed.entries_count, #iterator.prev);
-        _ -> []
-    end,
-    RightList = #panel{ class= <<"board-list-right">>, body=[
-        #panel{ body= #link{class= <<"button info">>,body= <<"Hack & Develop">>,href= <<"#">>} },
-        #panel{ body= #link{class= <<"button info">>,body= <<"About Erlach">>,href= <<"#">>} },
-        #panel{ body= #link{class= <<"button info">>,body= <<"Donate">>,href= <<"/donate">>} }
-        ]},
-    Html = lists:map(fun(#board{ id=Id, uri=Uri, name=Name }) ->
-        #panel{ class = <<"board">>, body = [
-            #link{ class= <<"button girl alpha">>, href = qs:ml({board,Uri}), body = [
-                #span{class= <<>>,body=wf:f("~s", [Uri])},
-                wf:html_encode(wf:f(" - ~s", [Name]))] }
-        ]} end, lists:reverse(Boards)),
-    html:body([#panel{ class= <<"board-list">>, body=Html},RightList]).
+    
+body() ->        
+    GroupsHtml=case kvs:get(feed,group) of
+        {ok,Gf} ->
+            Groups=kvs:traversal(group, Gf#feed.top, Gf#feed.entries_count, #iterator.prev),
+            lists:foldl(fun(#group{id=Gid,name=Gname,description=Gdesc},Acc) ->
+                BoardsOfGroup=case kvs:get(feed,{board,Gid}) of
+                    {ok,Bf} ->
+                        Group=#panel{class= <<"inline">>,body=#link{class= <<"button light alpha nohover">>,title=Gdesc,body=Gname}},
+                        Boards=lists:map(fun(#board{id=_Id,uri=Uri,name=Bname}) ->
+                            % #panel{class= <<"inline hint--right">>,data_fields=[{<<"data-hint">>,Bname}],body=[
+                            #panel{class= <<"inline">>,body=[
+                                #link{class= <<"button dark alpha">>,title=Bname,href=qs:ml({board,Uri}),body=
+                                    <<"/",(Uri)/binary,"/">> }]}
+                            end,kvs:traversal(board, Bf#feed.top, Bf#feed.entries_count, #iterator.prev)),
+                        [lists:reverse(Boards),Group];
+                    _ -> [] end,
+                [#panel{class= <<"group">>,body=BoardsOfGroup}|Acc]
+                end,[],Groups);
+        _ -> [] end,
+            
+    
+    % RightList = #panel{ class= <<"board-list-right">>, body=[
+    %     #panel{ body= #link{class= <<"button info">>,body= <<"Hack & Develop">>,href= <<"#">>} },
+    %     #panel{ body= #link{class= <<"button info">>,body= <<"About Erlach">>,href= <<"#">>} },
+    %     #panel{ body= #link{class= <<"button info">>,body= <<"Donate">>,href= <<"/donate">>} }
+    %     ]},
+    html:body(#panel{ class= <<"board-list">>, body=GroupsHtml}).
 
 event(init) ->
     % self() ! {server, "ololo"},
