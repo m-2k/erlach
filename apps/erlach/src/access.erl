@@ -1,12 +1,10 @@
 -module(access).
-% -compile(export_all).
 -export([ meta/1,
           discavering/2,
           lookup/2,
           is_allow/3,
           define/2,
           define/6,
-          % restrict/2,
           acl/1,
           default_access/1,
           update_elements_access_list/1]).
@@ -17,10 +15,6 @@
 -include_lib("db/include/thread.hrl").
 -include_lib("db/include/db.hrl").
 -include("erlach.hrl").
-
-% -ifndef(SESSION).
-% -define(SESSION, (wf:config(n2o,session,erlach_session))).
-% -endif.
 
 -define(DEFAULT_ACCESS_RULES, [{write,post},{write,blog},{write,thread},{write,message},{read,request}]).
 -define(FULL_ACCESS_RULES, [{moderate,post},{moderate,blog},{moderate,thread},{moderate,message},{moderate,request}]).
@@ -66,14 +60,6 @@ define(Uid,#thread{id=Tid}) -> define(Uid,private,thread,Tid,infinity,infinity).
 % access:define(1,private,thread,10,infinity,infinity).
 define(Uid,Group,Level,Lid,Begins,Expire) ->
     kvs_acl:define_access({user,Uid}, {Group,Level,Lid}, {Begins,Expire}).
-    
-% restrict(Table,Id) ->
-%     {ok, E} = kvs:get(Table,Id),
-%     E2 = case E of
-%         #thread{}=T -> T#thread{access=[{anonymous, read, blog},{private, write, blog}]};
-%         #board{}=B -> B#board{access=[{anonymous, read, blog},{private, write, blog}]}
-%     end,
-%     kvs:put(E2).
 
 acl({{user,_}, {anonymous,_,_}}) -> {infinity,infinity};
 acl({{user,1}, {moderator,board,1}}) -> {infinity,infinity};

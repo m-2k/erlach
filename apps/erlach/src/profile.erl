@@ -40,11 +40,6 @@ body() ->
                 % #panel{body=[#span{body= <<"Time zone">>},#span{body= <<"Default">>}]}
                 ]} ]
     end,
-    % wf:context((?CTX)#cx{req=wf:header(<<"Location">>,<<"/sasay">>,?REQ)}),
-    
-    % Req1 = wf:header(<<"Access-Control-Allow-Origin">>, Origin, NewCtx#cx.req),
-    % wf:state(status,301),
-    % wf:redirect({http,<<"/sasay">>}),
     html:body([ case config:debug() of true -> #span{body= wf:f("User: ~p", [u:get()])}; _ -> [] end, Content]).
 
 acc_list() -> [].
@@ -74,16 +69,7 @@ event({name,write}=Action) ->
                     html:error("Some error, plz refresh page and try again")
             end;
         _ -> html:warning("Wrong name, allowed 6-26 lowercase symbols: 'a-z', '.' and '_'")
-    end,
-    
-    % wf:info(?MODULE, "New name: ~p",[is_binary(Name)]),
-    
-    
-    % html:info("SASAY LALKA reg" ++ wf:temp_id()),
-    % html:success("SASAY LALKA reg" ++ wf:temp_id()),
-    % html:warning("SASAY LALKA reg" ++ wf:temp_id()),
-    % html:error("SASAY LALKA reg" ++ wf:temp_id()),
-    ok;
+    end, ok;
 event({name,modify,Name}=Action) ->
     case {kvs:get(name,Name), u:id()} of
         {{ok, #name{feed_id={name,Uid}}=N}, Uid} ->
@@ -99,16 +85,6 @@ event({name,update,Name}=Action) ->
     end;
 event({name, _}=Action) ->
     wf:update(<<"username-manage">>, html:username_form(Action));
-% event(join) ->
-%     case u:join() of
-%         {ok, User} ->
-%             wf:info(?MODULE, "User joined: ~p", [User]),
-%             wf:update(joinpanel, #panel{id=joinpanel, body=[
-%                 #span{class= <<"hint center">>,body= <<"Successfully! Here is U'r password, remember this:">>},
-%                 #span{class= <<"clipboard center">>, body=wf:html_encode(wf:f("~s",[User#user3.password]))}
-%             ]});
-%         Err -> wf:info(?MODULE, "Error joining: ~p", [Err])
-%     end;
 event(terminate) -> wf:info(?MODULE,"Terminate",[]);
 
 % exist

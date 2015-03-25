@@ -4,26 +4,17 @@
 -include("erlach.hrl").
 -include_lib("db/include/board.hrl").
 
-% parse_qs(Req) ->
-%     wf:info(?MODULE,"TEST", []),
-%     {Bindings,_}=cowboy_req:bindings(Req),
-%
-%     lists:foldl(fun({Key,Value}, R) ->
-%         case Key of
-%             board    -> R#route{board=Value};
-%             type     -> R#route{type=Value};
-%             thread   -> R#route{thread=Value};
-%             category -> R#route{category=Value};
-%             new      -> R#route{new=Value}
-%         end end,#route{},Bindings).
-
 % make link
-ml({thread,create,Uri})          -> "/"++wf:to_list(Uri)++"/new";
-ml({thread,Uri,Id})              -> "/"++wf:to_list(Uri)++"/"++erlang:integer_to_list(Id,?IDS_BASE);
-ml({board,Uri})                  -> "/"++wf:to_list(Uri);
+ml(root)                         -> "/";
+ml({thread,create,blog,Uri})     -> "/"++wf:to_list(Uri)++"/blog/new";
+ml({thread,create,_,Uri})        -> "/"++wf:to_list(Uri)++"/new";
+ml({thread,blog,Uri,Id})         -> "/"++wf:to_list(Uri)++"/blog/"++erlang:integer_to_list(Id,?IDS_BASE);
+ml({thread,_T,Uri,Id})           -> "/"++wf:to_list(Uri)++"/"++erlang:integer_to_list(Id,?IDS_BASE);
+ml({board,blog,Uri})             -> "/"++wf:to_list(Uri)++"/blog";
+ml({board,_T,Uri})               -> "/"++wf:to_list(Uri);
+ml({board,Uri})                  -> "/"++wf:to_list(Uri); % TODO: remove
 ml({category,blog,Uri,Category}) -> "/"++wf:to_list(Uri)++"/blog/:"++wf:to_list(Category);
-ml({category,_,Uri,Category})    -> "/"++wf:to_list(Uri)++"/:"++wf:to_list(Category);
-ml({board,blog,Uri})             -> "/"++wf:to_list(Uri)++"/blog".
+ml({category,_T,Uri,Category})   -> "/"++wf:to_list(Uri)++"/:"++wf:to_list(Category).
 
 init() ->
     Proplist=lists:foldl(fun(#board{id=Id,uri=Uri},Acc) -> [{wf:to_binary(Uri),Id}|Acc] end,[],kvs:all(board)),
@@ -31,3 +22,5 @@ init() ->
 
 board_uri_to_id(Uri) ->
     proplists:get_value(Uri, ets:lookup_element(globals,board_uri,2), undefined).
+board_id_to_uri(Id) ->
+    case lists:keyfind(Id,2,ets:lookup_element(globals,board_uri,2)) of false -> undefined; {Uri,Id} -> Uri end.

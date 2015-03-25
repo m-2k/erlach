@@ -53,7 +53,10 @@ menu(User) ->
             #link {class=Class, href= <<"#">>, body= <<"News">>},
             #link {class=Class, href=qs:ml({board,blog,<<"e">>}), body= <<"Blog">>} ]} ].
 
-navigation2(?ACTION_API) ->
+
+gettype() -> ?CTX#cx.path#route.type.
+
+breadcrumbs2(?ACTION_API) ->
     Body = case {Level,Action} of
         {thread, view} -> #li{body=[#link{body= <<"thread">>},#link{body= <<"view">>}]};
         {thread, new} -> <<"thread new">>;
@@ -62,13 +65,22 @@ navigation2(?ACTION_API) ->
     #panel{class= <<"center">>,body=#ul{class= <<"breadcrumb">>,body=Body}}.
     
     
-navigation(?ACTION_API) ->
-    Body = case {Level,Action} of
-        {thread, view} -> #li{body=[#link{body= <<"thread">>},#link{body= <<"view">>}]};
-        {thread, new} -> <<"thread new">>;
-        {board, view} -> [#link{class= <<"button menu slim">>,body= <<"Main">>},#link{class= <<"button menu slim">>,body= <<"Фетиш"/utf8>>},#link{class= <<"button menu slim">>,body= <<"Тред 666"/utf8>>}]
+breadcrumbs(?ACTION_API) ->
+    Type = gettype(),
+    Class = <<"link slim">>,
+    Main = #link{class=Class,body= <<"Эрлач"/utf8>>,href=qs:ml(root) },
+    
+    wf:info(?MODULE, "BreadCrumbs: ~p",[Type]),
+    
+    Body = case {Level,Action,Type} of
+        {thread,_,blog} -> [Main,
+            #link{class=Class,body=Board#board.name,href=qs:ml({board,thread,Board#board.uri})},
+            #link{class=Class,body= <<"Блог"/utf8>>,href=qs:ml({board,Type,Board#board.uri})}];
+        {thread,_,_} -> [Main,#link{class=Class,body=Board#board.name,href=qs:ml({board,thread,Board#board.uri})}];
+        {board,view,blog} -> [Main,#link{class= <<Class/binary," nolink">>,body= <<"Блог"/utf8>>}];
+        {board,view,_} -> [Main]
     end,
-    #panel{class= <<"center">>,body=Body}.
+    #panel{class= <<"breadcrumbs center">>,body=Body}.
 
 footer() ->
     Class=?FOOTER_LINKS,
@@ -105,6 +117,7 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
 
     AllowWrite = access:is_allow(message,write,Access),
     wf:info(?MODULE, "State: ~p",[AllowWrite]),
+    BreadCrumbs=breadcrumbs(S),
     
     Content = case Action of
         view ->
@@ -119,7 +132,7 @@ thread_body({Access, Board, Thread, {thread, Action, Data}}=S) ->
                 #panel{id=posts,body=[Head,Posts]} ];
         create -> [ ]
     end,
-    #panel{id=imageboard,body=[Content,input_form(S),image_viewer()]}.
+    #panel{id=imageboard,body=[BreadCrumbs,Content,input_form(S),image_viewer()]}.
 
 input_form_id() -> <<"drag-input-form">>.
 input_form({Access, Board, Thread, {Type, Action, Data}}=S) ->
@@ -142,7 +155,8 @@ input_form({Access, Board, Thread, {Type, Action, Data}}=S) ->
                     CatSelector,
                     #panel{class= <<"right-container">>, body=[
                         name_selector(u:get()),
-                        if AllowMarkdown -> #link{id=markdown,class= <<"button info">>,body= <<"Enable Markdown">>,postback=enable_markdown};
+                        if AllowMarkdown -> #link{id=markdown,class= <<"link info compact">>,
+                            body= <<"Enable Markdown">>,postback=enable_markdown};
                             true -> [] end,
                         #link{id= <<"store">>,class=BClass,body=BBody,postback=BPostback,source=BSource} ]},
                     #panel{id= <<"thumbnail-list">>}]}]};
@@ -213,15 +227,16 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
     case {post_check_visibility(Uid,IsModerate,Thread,Post),Deleted} of
         {ok,undefined} ->
             Class = if IsBlog -> <<"thread-blog">>; true -> <<"thread-post">> end,
+            ReplyId = utils:hex_id({reply,Id}),
             Html = #panel { id = utils:hex_id({post,Id}), class = Class, body = [
                 % #panel{ class = <<"timestamp">>, body = guard:html_escape(wf:f("~2w:~2..0w:~2..0w", [Hour, Minute,Second])) },
                 % #panel{ class = <<"right-side">>, body = [
                     case {CanDelete, IsHead} of
-                        {true, true} -> #link{ class = <<"button danger slim">>, body = <<"Delete thread">>, postback = {hide_thread, Tid} };
-                        {true, _} -> #link{ class = <<"button danger slim">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
+                        {true, true} -> #link{ class = <<"link danger compact">>, body = <<"Delete thread">>, postback = {hide_thread, Tid} };
+                        {true, _} -> #link{ class = <<"link danger compact">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
                         _ -> [] end,
                     case CanEdit of true -> %html:error(wf:to_list(Id)),
-                        #link{ class = <<"button info slim">>, body = <<"✎"/utf8>>, postback = {edit_post, Id} }; _ -> [] end,
+                        #link{ class = <<"link info compact">>, body = <<"✎"/utf8>>, postback = {edit_post, Id} }; _ -> [] end,
                     case ThreadType of
                         request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
                             
@@ -241,17 +256,22 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
                         anonymous -> <<"anonymous">>;
                         Uname -> guard:html_escape(Uname) end } end,
                     #span{ class = <<"message">>, body = Text },
+                    #link{ id=ReplyId, class = <<"reply link primary compact">>, body = <<"↩"/utf8>>, data_fields=[{<<"data-id">>,wf:to_integer(Id)}] },
                     #panel{ class = <<"post-attachment">>, body = post_attachment(Post) }
                 %    ]}
                 ]},
+                Wire = "qi(\"reply-"++utils:hex_id(Id)++"\").addEventListener(\"click\", function(e) {"++
+                "var message = qi(\"message\"); message.value = message.value + \">>\" + this.dataset.id + \" \";});",
+                wf:info(?MODULE,"bind post: ~p",[Wire]),
+                wf:wire(Wire),
             {ok, Html};
         {ok,_} ->
             case CanRestore of
                 true ->
                     Html = #panel { id = utils:hex_id({post,Id}), class = <<"thread-post">>, body = [
                             case IsHead of
-                                true -> #link{ class = <<"button success slim">>, body = <<"Restore thread">>, postback = {show_thread, Tid} };
-                                _ -> #link{ class = <<"button success slim">>, body = <<"⟳"/utf8>>, postback = {show_post, Id} }
+                                true -> #link{ class = <<"link success compact">>, body = <<"Restore thread">>, postback = {show_thread, Tid} };
+                                _ -> #link{ class = <<"link success compact">>, body = <<"⟳"/utf8>>, postback = {show_post, Id} }
                             end,
                             case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
                                 anonymous -> <<"anonymous">>;
@@ -291,11 +311,14 @@ board_body_private({Access, Board, Thread, {board, Action, Data}}=S) ->
                 case Board#board.request_thread of
                     undefined -> [];
                     Tid -> #link{class= <<"button success">>, body= <<"Make request for access to this board">>,
-                        url=qs:ml({thread, Board#board.uri, Tid}) }
+                        url=qs:ml({thread, gettype(), Board#board.uri, Tid}) }
                 end ]})
     end.
 
-board_body({Access, #board{id=Bid,uri=Uri,name=Name,description=Description,category=Cat}=Board, Thread, {board, Action, {Type,Bid}=Data}}=S) ->
+board_body({Access, #board{id=Bid,uri=Uri,feed_id=Bf,name=Name,description=Description,category=Cat}=Board, Thread, {board, Action, {Type,Bid}=Data}}=S) ->
+    
+    TeenGid = 9,
+    if Bf =:= {board,TeenGid} -> html:info(wf:to_list(<<"Единый телефон доверия психологической помощи: 8-800-2000-122"/utf8>>)); true -> ok end,
     
     Route=?CTX#cx.path,
     case config:debug() of true -> html:info("ACCESS: " ++ wf:to_list(Access)); _ -> ok end,
@@ -304,7 +327,7 @@ board_body({Access, #board{id=Bid,uri=Uri,name=Name,description=Description,cate
     AllowMessage = access:is_allow(message,write,Access),
     AllowBlog = access:is_allow(blog,write,Access),
     
-    Navigation = navigation(S),
+    BreadCrumbs = breadcrumbs(S),
     Head = [ #panel{class= <<"content-title">>,body=Name}, #span{class= <<"remark">>,body=Description} ],
     Manage = #panel{class= <<"center">>,body=[
         case Data of
@@ -317,7 +340,7 @@ board_body({Access, #board{id=Bid,uri=Uri,name=Name,description=Description,cate
         if AllowRequest ->
             case Board#board.request_thread of
                 undefined -> #link{class= <<"button info slim">>, body= <<"New request">>,postback={thread, create, {request, {board, Bid}}}};
-                Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,Uri,Rtid}) }
+                Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,gettype(),Uri,Rtid}) }
             end; true -> [] end,
         lists:map(fun({Cid,Ctext}) ->
             Class = case Route#route.category =:= wf:to_binary(Cid) of
@@ -327,7 +350,7 @@ board_body({Access, #board{id=Bid,uri=Uri,name=Name,description=Description,cate
             end,Cat) ]},
     Main = #panel{id= <<"threads">>, class= <<"line">>, body=board_content(S)},
     Settings = case u:is_admin() of true -> settings_panel(board, Board); _ -> [] end,
-    html:body([Head,Manage,Main,Settings,image_viewer()]).
+    html:body([BreadCrumbs,Head,Manage,Main,Settings,image_viewer()]).
 
 board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) ->
     IsAdmin = u:is_admin(),
@@ -383,7 +406,7 @@ html_thread(#board{uri=Uri},#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#p
             #panel{class= <<"thread-topic">>,body=[
                 #link{class= <<"link">>,
                     body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
-                    href=qs:ml({thread,Uri,Id})}
+                    href=qs:ml({thread,gettype(),Uri,Id})}
             ]},
             case IsBlog of true -> []; _ -> #span{class= <<"username">>,body= <<"anonymous">>} end,
             #span{class= <<"message">>,body=Text},

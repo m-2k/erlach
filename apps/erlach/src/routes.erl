@@ -12,27 +12,6 @@
 %% [code:ensure_loaded(M) || M <- [index, login, ... ]]
 
 finish(State, Ctx) -> {ok, State, Ctx}.
-% init(State, Ctx) ->
-%     % Path = wf:path(Ctx#cx.req),
-%     % wf:info(?MODULE,"ROUTE path: ~p",[Ctx#cx.path]),
-%
-%     % Route = case erlang:erase(route) of
-%     %     undefined ->
-%             R = qs:parse_qs(Ctx#cx.req),
-%             Module = case route(R#route.board) of
-%                 undefined ->
-%                     case R#route.new of undefined ->
-%                         case R#route.thread of undefined -> board; _ -> thread end;
-%                         _ -> thread
-%                     end;
-%                 M -> M end,
-%             R2=R#route{module=Module},
-%     %         wf:wire(#transfer{state=[{route,R2}]}),
-%     %         R2;
-%     %     Exist -> Exist
-%     % end,
-%     wf:info(?MODULE,"Route: ~p ~p~n",[self(),R2]),
-%     {ok, State, Ctx#cx{path=R2,module=R2#route.module}}.
 
 init(State, Ctx) ->
     Req=Ctx#cx.req,
@@ -46,6 +25,7 @@ init(State, Ctx) ->
     
     Route = case static(Q1) of
         undefined -> dinamic(Q1,Q2,Q3);
+        #route{}=R -> R;
         Static -> #route{module=Static} end,
     wf:info(?MODULE,"ROUTE: ~p",[Route]),
     {ok, State, Ctx#cx{path=Route,module=Route#route.module}}.
@@ -58,8 +38,6 @@ init(State, Ctx) ->
 % /g/blog/:category-1     -> board:blog&cat
 % /g/blog/AB68            -> thread:blog
 % /g/AB68/                -> thread
-
-
 
 % /:BOARD/(:CAT|:TYPE|:NEW|:THREAD)/(:CAT|:THREAD)/
 
@@ -75,7 +53,9 @@ dinamic(_,_,_) -> root.
     
 
 static(undefined)         -> root;
-static(<<"privacy">>)     -> privacy;
+static(<<"privacy">>)     -> #route{module=static,option=privacy};
+static(<<"terms">>)       -> #route{module=static,option=terms};
+static(<<"about">>)       -> #route{module=static,option=about};
 static(<<"donate">>)      -> donate;
 static(<<"profile">>)     -> profile;
 static(<<"favicon.ico">>) -> static_file;

@@ -34,30 +34,13 @@ body() ->
                 [#panel{class= <<"group">>,body=BoardsOfGroup}|Acc]
                 end,[],Groups);
         _ -> [] end,
-            
-    
-    % RightList = #panel{ class= <<"board-list-right">>, body=[
-    %     #panel{ body= #link{class= <<"button info">>,body= <<"Hack & Develop">>,href= <<"#">>} },
-    %     #panel{ body= #link{class= <<"button info">>,body= <<"About Erlach">>,href= <<"#">>} },
-    %     #panel{ body= #link{class= <<"button info">>,body= <<"Donate">>,href= <<"/donate">>} }
-    %     ]},
     html:body(#panel{ class= <<"board-list">>, body=GroupsHtml}).
 
 event(init) ->
-    % self() ! {server, "ololo"},
-    % self() ! {custom, "ololo"},
-    % self() ! {server, "ololo", 3},
-    % self() ! {server, {temp_user_created,undefined}},
     wf:info(?MODULE, "User: ~p WS Pid: ~p, State ~p", [wf:user(), self(), get(state)]);
 event({server, {temp_user_created,User}}) ->
     wf:info(?MODULE, "SERVER EVENT User: ~p WS Pid: ~p, State ~p", [u:id(User), self(), get(state)]),
     html:info("Clear browser cache if U have problem"),
     html:warning("Development version");
-% event({server, Message}) -> % OK
-%     wf:info(?MODULE, "Server message: ~p", [Message]);
-% event({server, Message, M}) ->
-%     wf:info(?MODULE, "Server3 message: ~p ~p", [Message,M]); %% NOT WORK, USE {server, Val}
-% event({custom, Message}) ->
-%     wf:info(?MODULE, "Custom message: ~p", [Message]);  %% NOT WORK, USE {server, Val}
 event(terminate) -> skip;
 event(Event) -> guard:shared_event(?MODULE, Event).

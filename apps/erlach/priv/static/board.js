@@ -6,6 +6,7 @@ var thumb_iterator = 0;
 $binary.do = function(e) { debugger; console.log("BINARY: " + e) };
 $bert.do = function(e) { console.log("BERT: " + e) };
 
+
 function drag_input_init() {
     var ipt = document.getElementById('drag-input-form');
     if(ipt) {

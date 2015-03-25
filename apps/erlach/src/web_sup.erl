@@ -34,36 +34,10 @@ init([]) ->
 
 mime() -> [{mimetypes,cow_mimetypes,all}].
 
-% dispatch_rules() ->
-%     cowboy_router:compile(
-%         [{'_', [
-%             {"/static/[...]", n2o_dynalo, {dir, "apps/erlach/priv/static", mime()}},
-%             {"/n2o/[...]", n2o_dynalo, {dir, "deps/n2o/priv", mime()}},
-%             {"/rest/:resource", rest_cowboy, []},
-%             {"/rest/:resource/:id", rest_cowboy, []},
-%             % {"/ws/[...]", bullet_handler, [{handler, n2o_bullet}]},
-%             {"/ws/[:module/[:id/[:extra/[...]]]]", bullet_handler, [{handler, n2o_bullet}]},
-%             % {"/[:module/[:id/[blog]]]", [{id, int}], n2o_cowboy, []}
-%             {"/[:module/[:id/[:extra/[...]]]]", n2o_cowboy, []}
-%             % {'_', n2o_cowboy, []}
-%     ]}]).
-
 dispatch_rules() ->
     cowboy_router:compile(
         [{'_', [
-            {"/static/[...]", n2o_dynalo, {dir, "apps/erlach/priv/static", mime()}}, % STATIC
-            
-            % {"/ws/[...]", bullet_handler, [{handler, n2o_bullet}]},
-            
-            % {"/ws/[:board/[:type/[:thread/[:category]]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}],bullet_handler, [{handler, n2o_bullet}]},
-            % {"/ws/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], bullet_handler, [{handler, n2o_bullet}]},
-            % {"/ws/[:board/[:thread/[:category]]]", bullet_handler, [{handler, n2o_bullet}]},
-            %
-            % {"/[:board/[:type/[:thread/]]]", [{type, function, fun(<<"blog">>) -> true; (_) -> false end}], n2o_cowboy, []},
-            % {"/[:board/[:new]]", [{new, function, fun(<<"new">>) -> true; (_) -> false end}], n2o_cowboy, []},
-            % {"/[:board/[:thread/[:category]]]", n2o_cowboy, []}
-            
+            {"/static/[...]", n2o_dynalo, {dir, "apps/erlach/priv/static", mime()}},
             {"/ws/[:q1/[:q2/[:q3]]]", bullet_handler, [{handler, n2o_bullet}]},
             {"/[:q1/[:q2/[:q3]]]", n2o_cowboy, []}
-            
         ]}]).

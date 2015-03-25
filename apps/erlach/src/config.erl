@@ -38,7 +38,7 @@ log_modules() ->
         % n2o_binary
     ].
 
-log_level() -> info.
+log_level() -> warning.
 
 % debug() -> false.
 debug() -> false.

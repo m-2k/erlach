@@ -34,10 +34,6 @@ body({Access, _Board, _Thread, _Action}=Data) ->
         {title,html:title(?MODULE,Data)}]}.
 
 init_state() ->
-    % wf:info(?MODULE,"Test ~p",[init_state]),
-    
-    % wf:info(?MODULE,"Binding INIT: ~p",[erlang:get(matched_qs)]),
-    % #{thread := RouteT, board := _RouteB} = erlang:get(matched_qs),
     Route=?CTX#cx.path,
     
     case {guard:to_integer(Route#route.thread,?IDS_BASE),?SESSION:get_param(?MODULE)} of
@@ -56,12 +52,6 @@ check_access_to_thread(Tid, Action) ->
     {ok,#thread{feed_id={thread,Bid},name=Topic}=Thread}=kvs:get(thread,Tid),
     {ok,Board}=kvs:get(board,Bid),
     AccessMetaList = [access:meta(Board),access:meta(Thread)],
-    % case access:discavering(User,AccessMetaList) of
-%         {ok, Access} ->
-%             wf:info(?MODULE, "Access OK: ~p",[Access]),
-%             wf:wire(#transfer{state=[{board,Board},{thread,Thread},{action,Action}]}),
-%             {ok, {Access, Board, Thread, Action}};
-%         E -> E end.
     Access=access:discavering(User,AccessMetaList),
     wf:wire(#transfer{state=[{board,Board},{thread,Thread},{action,Action},{access,Access}]}),
     {ok, {Access, Board, Thread, Action}}.
@@ -70,34 +60,17 @@ check_access_to_board(Bid, Action) ->
     User = u:get(),
     {ok,Board}=kvs:get(board,Bid),
     AccessMetaList = [access:meta(Board)],
-    % case access:discavering(User,AccessMetaList) of
-    %     {ok, Access} ->
-    %         wf:info(?MODULE, "Access OK: ~p",[Access]),
-    %         wf:wire(#transfer{state=[{board,Board},{action,Action}]}),
-    %         {ok, {Access, Board, undefined, Action}};
-    %     E -> E end.
     Access=access:discavering(User,AccessMetaList),
     wf:wire(#transfer{state=[{board,Board},{action,Action},{access,Access}]}),
     {ok, {Access, Board, undefined, Action}}.
 
 event(init) ->
-    % wf:info(?MODULE, "----> BOARD: ~p, THREAD: ~p", [get(board), get(thread)]),
     erlang:put(?NEWEST_POSTS,[]),
     erlang:put(attachments,[]),
-    % wf:info(?MODULE, "Bridge info: ~p", [proplists:get_value(<<"user-agent">>, element(17,?REQ),undefined)]),
     case erlang:get(action) of
         {thread, view, Tid} ->
-            % put(?THREAD_ID, guard:to_integer(Tid)),
             wf:reg({thread, guard:to_integer(Tid)});
-        % {thread, create, {post, Bid}} -> put(?BOARD_ID, wf:to_integer(Bid));
-        % {thread, create, {request, {board=Element, ElementId}}} ->
-        %     u:restricted_call(fun() ->
-        %         put(?STORED_REQUEST_TO, {Element,ElementId})
-        %         end,{feature,admin})
-        _ -> ok
-    end,
-    % wf:info(?MODULE, " BOARD: ~p, THREAD: ~p, USER_ID: ~p", [get(?BOARD_ID), get(?THREAD_ID), u:id(u:get())]),
-    ok;
+        _ -> ok end, ok;
 
     
 event({client, auto_store}) ->
@@ -105,19 +78,16 @@ event({client, auto_store}) ->
     message(store);
 event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
     wf:info(?MODULE,"Final storing",[]),
-    % wf:info(?MODULE,"~p ~p",[u:id(),wf:q(name_selector)]),
     case guard:is_empty(wf:q(message)) of
         true -> html:warning("Nothing to publish, bro.");
         false ->
             {ok, {T,P}} = message(finalize),
-            % P=message(store),
             erlang:put(attachments,[]),
             B=erlang:get(board),
-            % T=erlang:get(thread),
             wf:info(?MODULE,"Final storing -sending",[]),
             wf:send({thread,T#thread.id},{server, {add, post, P, self()}}),
             case erlang:get(action) of
-                {thread,create,{request, _}} -> wf:redirect(qs:ml({thread,B#board.uri,T#thread.id}));
+                {thread,create,{request, _}} -> wf:redirect(qs:ml({thread,thread,B#board.uri,T#thread.id}));
                 {thread,create,{blog,_}} -> wf:redirect(qs:ml({board,blog,B#board.uri}));
                 {thread,create,_} -> wf:redirect(qs:ml({board,B#board.uri}));
                 _ ->
@@ -132,9 +102,7 @@ event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
                         wf:info(?MODULE,"Final storing -img update",[]),
                         S={erlang:get(access),erlang:get(board),erlang:get(thread),erlang:get(action)},
                         wf:insert_after(posts,html:input_form(S));
-                    true -> add_post(P) end end
-            % {ok,_}=message(finalize)
-    end;
+                    true -> add_post(P) end end end;
 
 event({request, accepted, {Level,Lid}=ReqTo, User, PostId}) ->
     wf:info(?MODULE, "Granting access to ~p for ~p", [ReqTo,User]),
@@ -201,14 +169,14 @@ event({edit_post,Id}) ->
     wf:info(?MODULE, "Edit post: ~p", [4]);
 event(enable_markdown) ->
     % u:restricted_call(fun() ->
-        wf:update(markdown,#link{id=markdown,class= <<"button warning">>,body= <<"Disable Markdown">>,postback=disable_markdown}),
+        wf:update(markdown,#link{id=markdown,class= <<"link warning compact">>,body= <<"Disable Markdown">>,postback=disable_markdown}),
         P = message(create),
         erlang:put(post,P#post{markup=markdown}),
         % end, {feature, admin}),
         ok;
 event(disable_markdown) ->
     % u:restricted_call(fun() ->
-        wf:update(markdown,#link{id=markdown,class= <<"button info">>,body= <<"Enable Markdown">>,postback=enable_markdown}),
+        wf:update(markdown,#link{id=markdown,class= <<"link info compact">>,body= <<"Enable Markdown">>,postback=enable_markdown}),
         P = message(create),
         erlang:put(post,P#post{markup=undefined}),
         % end, {feature, admin}),
@@ -218,7 +186,8 @@ event({binary,{attachment,upload,Position,Name,_Type,_Size,Date,Data}}) ->
     wf:info(?MODULE, "Position: ~p",[Position]),
     P = message(create),
     wf:info(?MODULE, "New messg: ~p",[P#post.id]),
-    if is_integer(Position) andalso is_binary(Data) andalso (size(Data) >= ?UPLOAD_MIN_SIZE) andalso (size(Data) =< ?UPLOAD_MAX_SIZE) ->
+    if is_integer(Position) andalso is_binary(Data)
+        andalso (size(Data) >= ?UPLOAD_MIN_SIZE) andalso (size(Data) =< ?UPLOAD_MAX_SIZE) ->
             case image:mime_type(Data) of
                 undefined -> self() ! {server, {attachment,upload,Position,wrong_mime_type}};
                 {Mime,Ext} ->
@@ -272,12 +241,10 @@ event(terminate) ->
                 {ok, F} ->
                     Attachments = kvs:traversal(attachment, F#feed.top, F#feed.entries_count, #iterator.prev),
                     lists:map(fun(A) ->
-                        % kvs:remove(A),
                         kvs:delete(attachment,A#attachment.id), % raw ops without feed recalc
                         file:delete(filename:join(?SITE_ROOT_LOCATION, A#attachment.path))
                     end,Attachments),
-                    % kvs:remove(F); % +kvs:get operation to performans
-                    kvs:delete(feed,{attachment,Pid}); % raw ops without feed recalc
+                    kvs:delete(feed,{attachment,Pid});
                 _ -> skip
             end,
             kvs:remove(post, Pid);
@@ -338,7 +305,6 @@ thread(store) ->
     T = thread(create),
     T3 = case erlang:get(action) of
         {thread,create,_} ->
-            % wf:info(?MODULE, "THREAD ~p",[T]),
             T2 = T#thread{name=wf:to_binary(guard:prevent_undefined(wf:q(topic),<<>>))},
             kvs:put(T2),
             erlang:put(thread, T2), T2;
@@ -355,14 +321,6 @@ thread(finalize) ->
     T = thread(store),
     Uname=html:name_selector_extract(wf:q(name_selector)), % only for create
     case erlang:get(action) of
-        % {thread, create, {request=Type, {board=Level, Lid}}} ->
-        %     {ok,E}=kvs:get(Level,Lid),
-        %     E2 = setelement(#db_element.request_thread,E,T#thread.id),
-        %     kvs:put(E2),
-        %     T2 = T#thread{request_to={Level,Lid}, type=Type, temporary=false, user_name=Uname},
-        %     kvs:put(T2),
-        %     erlang:erase(thread),
-        %     {ok, T2};
         {thread,create,{Type,To}} ->
             T2=case {Type,To} of
                 {request, {board=Level, Lid}} ->
@@ -404,7 +362,6 @@ message(create) ->
             erlang:put(post, P3), P3;
         Exist -> Exist
     end;
-    % message(store);
 
 message(store) ->
     P = message(create),

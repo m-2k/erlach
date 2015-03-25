@@ -3,20 +3,9 @@
 
 -compile(export_all).
 -include_lib("n2o/include/wf.hrl").
-% -include_lib("kvs/include/kvs.hrl").
-% -include_lib("kvs/include/feed.hrl").
-% -include_lib("db/include/post.hrl").
-% -include_lib("db/include/attachment.hrl").
-%
-% -include_lib("db/include/board.hrl").
-% -include_lib("db/include/user.hrl").
 -include("erlach.hrl").
 
-% -ifndef(SESSION).
-% -define(SESSION, (wf:config(n2o,session,erlach_session))).
-% -endif.
-
-main() -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {theme,<<"glassy donate">>}, {title,<<"Donate">>}]}.
+main() -> #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {title,<<"Donate">>}]}.
 body() ->
     Content = #panel{class= <<"center">>, body=iframe()},
     html:body(Content).

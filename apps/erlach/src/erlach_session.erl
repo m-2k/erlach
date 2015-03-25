@@ -4,7 +4,6 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -export(?SESSION_API).
 -compile(export_all).
-%-record(state, {unique, node}).
 
 -include("erlach.hrl").
 -include_lib("db/include/user.hrl").
@@ -32,17 +31,12 @@ init(State, Ctx) ->
             {Now_GMT, Expire_GMT} = expire(),
             Cookie = {{SID,?AUTH},#cookie{status=new,path=?COOKIE_PATH,ttl=ttl(),issued=Now_GMT,expire=Expire_GMT}},
             wf:info(?MODULE, "New cookie: ~p", [Cookie]),
-            % User = #user3{id={?T,SID},created=Now_GMT},
-            % wf:info(?MODULE, "New user: ~p", [User]),
             ets:insert(cookies,Cookie),
-            % ets:insert(cookies,{{SID,?USER},User}),
             Cookie;
         {exist, {{SID, _K}, #cookie{issued=Issued}} = _Cookie} ->
             {_Now_GMT_2, Expire_GMT_2} = expire(),
             Cookie2 = {{SID,?AUTH},#cookie{status=actual,path=?COOKIE_PATH,ttl=ttl(),issued=Issued,expire=Expire_GMT_2}},
             wf:info(?MODULE, "Cookie exist: ~p", [Cookie2]),
-            % {{SID, ?USER}, User} = lookup_ets({SID,?USER}),
-            % wf:info(?MODULE, "User exist: ~p", [User]),
             ets:insert(cookies,Cookie2),
             Cookie2
     end,

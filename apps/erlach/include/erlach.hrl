@@ -42,5 +42,6 @@
     board,
     type :: blog|thread,
     thread,
-    category
+    category,
+    option :: any()
     }).

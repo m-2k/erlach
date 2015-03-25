@@ -2,14 +2,9 @@
 -compile(export_all).
 
 -include_lib("n2o/include/wf.hrl").
-% -include_lib("kvs/include/kvs.hrl").
 -include_lib("kvs/include/feed.hrl").
 -include_lib("db/include/user.hrl").
 -include("erlach.hrl").
-
-% -ifndef(SESSION).
-% -define(SESSION, (wf:config(n2o,session,n2o_session))).
-% -endif.
 
 -define(SESSION_USER, session_user).
 
@@ -22,8 +17,6 @@ new_user(SessionID, Created) ->
     % ets:insert(cookies,{{SessionID,?USER},U}), % speed 5-6 ms
     wf:user(U), % speed 6-9 ms
     wf:wire(#transfer{events={server,{temp_user_created,U}}}),
-    % Fun = erlang:get(user_test),
-    % case is_function(Fun) of true -> Fun(); _ -> ok end,
     U.
 ensure_user() ->
     wf:info(?MODULE, "Ensure user: ~p", [?CTX#cx.session]),
@@ -70,13 +63,6 @@ check_access(Feature) -> check_access(u:id(), Feature).
 check_access(U, Feature) -> % User or Uid
     Uid = u:to_id(U),
     kvs_acl:check([ {{user,Uid},Feature} ]).
-% check_access(U, Feature) -> % User or Uid
-%   Uid = u:to_id(U),
-%   case is_temp(Uid) of
-%       false -> kvs_acl:check([ {{user,Uid},Feature} ]);
-%       % _X -> kvs_acl:check([ {{user,id(User)},Feature} ]); % TODO: удалить после допила avz
-%       _ -> none
-%   end.
 define_access(U, Feature, Action) -> % User or Uid
     Uid = u:to_id(U),
     case is_temp(Uid) of
@@ -102,7 +88,6 @@ to_id(Id) -> Id.
 is_temp() -> is_temp(u:id()).
 is_temp(U) -> case u:to_id(U) of {?T, _} -> true; _ -> false end.
 restricted_call(Fun, Feature, Default) ->
-    % wf:info(?MODULE, "Restricted call ~p ~p ~p", [u:get(), Feature, Default]),
     case u:check_access(u:get(), Feature) of
         allow -> Fun();
         _ -> Default
@@ -110,7 +95,6 @@ restricted_call(Fun, Feature, Default) ->
 restricted_call(Fun, Feature) -> restricted_call(Fun, Feature, undefined).
 is_admin() -> is_admin(u:get()).
 is_admin(UserOrId) ->
-    % wf:info(?MODULE, "Check for admin: ~p ~p", [u:id(), kvs_acl:check([{{user,u:id()}, {feature,admin}}])]),
     case kvs_acl:check([{{user,u:to_id(UserOrId)}, {feature,admin}}]) of allow -> true; _ -> false end.
 
 store_temp_user() ->
@@ -119,76 +103,11 @@ store_temp_user() ->
     u:put(Stored),
     Stored.
 
-% update_prop(TupleList) ->
-%     lists:foldl(fun({Key, Value}, User) ->
-%             case Key of
-%                 id      -> User#user3{id=Value};
-%                 name    -> User#user3{name=Value};
-%                 expired -> User#user3{expired=Value};
-%                 enabled -> User#user3{enabled=Value};
-%                 % banned    -> User#user3{banned=Value};
-%                 deleted -> User#user3{deleted=Value};
-%                 % role  -> User#user3{role=Value};
-%                 password-> User#user3{password=Value};
-%                 salt    -> User#user3{salt=Value};
-%                 tokens  -> User#user3{tokens=Value};
-%                 % access    -> User#user3{access=Value};
-%                 % names -> User#user3{names=Value};
-%                 created -> User#user3{created=Value};
-%                 % date  -> User#user3{date=Value};
-%                 % zone  -> User#user3{zone=Value};
-%                 % type  -> User#user3{type=Value};
-%                 email   -> User#user3{email=Value};
-%                 phone   -> User#user3{phone=Value}
-%             end
-%         end, u:get(), TupleList).
-%
-% t() -> %% testing
-%     erlang:put(?SESSION_USER, #user3{id={?T,111}}),
-%     update_prop([{name,"ololosh"}]).
-
-% grant(Id) ->
-%     kvs_acl:define_access({user,Id}, {feature,admin}, allow).
 clone(Id) ->
     {ok,U1} = kvs:get(user3,Id),
     U2 = setelement(19,U1,wf:to_binary(wf:temp_id())),
     U3 = setelement(30,U2,[{twitter,wf:to_binary(wf:temp_id())}|undefined]),
     kvs:put(U3).
-
-% {read, {board,3, thread,Type}} -> {allow,infinity,infinity}
-% u:ca({board,write,{default,7},{thread,4}}).-> {allow,infinity,infinity}
-% pa() ->
-%     kvs_acl:define_access({user,1}, {read, {board, 3, thread, default}}, {allow,infinity,infinity}).
-
-% get_initial_access(Uid, {Action, {_Purpose, _Section, Object, Type}}=Feature) ->
-%     % Read -> {allow, infinity},    % as {read, global}
-%     % Write -> {allow, infinity},   % as {write, global}
-%     % {undefined,Read,Write,none}.
-%     Allow={allow,infinity,infinity},
-%     Deny = none,
-%     Access=u:check_access(Uid, Feature),
-%     case Access of
-%         Deny ->
-%             case {Action,Object,Type} of
-%                 {read,thread,_} -> Allow;
-%                 {read,board,_} -> Allow;
-%                 {write,thread,default} -> Allow;
-%                 {write,thread,request} -> Allow;
-%                 {write,board,default} -> Allow;
-%                 _ -> Deny
-%             end;
-%         _ -> Access
-%     end.
-
-% ca({Object, OAction, {OType, _Data}, Parent}) ->
-%     Purpose = element(1,Parent),
-%     Action = case OAction of delete -> moderate; _ -> OAction end,
-%
-%     Section = element(2,Parent),
-%     Type = OType,
-%
-%     Feature = {Action,{Purpose,Section,Object,Type}},
-%     get_initial_access(1,Feature).
 
 names() -> names(u:get()).
 names(User) ->
