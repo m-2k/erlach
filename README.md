@@ -4,7 +4,7 @@ Erlach Imageboard Services
 ## Overview
 Erlach – Anonymous imageboard as SPA on the WebSockets and uses BPG images.
 
-Now in beta testing and located at https://erlach.erlang.one
+Now in beta testing and located at https://erlach.co
 
 ## Features
 
