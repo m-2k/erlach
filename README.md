@@ -1,10 +1,11 @@
 # ERLACH
-Erlach Imageboard Services
+**Fully anonymous imageboard and anonymous comments service**
 
 ## Overview
-Erlach – Anonymous imageboard as SPA on the WebSockets and uses BPG images.
 
-Now in beta testing and located at https://erlach.co
+* Erlach – Anonymous imageboard as SPA on the WebSockets and supports BPG images.
+* This reposutory is oudated (R1-RC1)
+* Erlach latest version hosted on a domain [erlach.co](https://erlach.co)
 
 ## Features
 
@@ -17,5 +18,5 @@ Now in beta testing and located at https://erlach.co
 
 ## Feedback
 
-* Twitter `@_m_2k`
+* Twitter [@erlach_co](https://twitter.com/erlach_co)
 * On errors make as issue in this repository
