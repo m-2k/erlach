@@ -18,4 +18,4 @@ Now in beta testing and located at https://erlach.co
 ## Feedback
 
 * Twitter `@_m_2k`
-* Known errors make as issue in this repository
+* On errors make as issue in this repository
