@@ -1,4 +1,4 @@
-# ERLACH
+# 〘〙 ERLACH
 **Fully anonymous imageboard and anonymous comments service**
 
 ## Overview
