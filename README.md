@@ -5,7 +5,7 @@
 
 * Erlach – Anonymous imageboard as SPA on the WebSockets and supports BPG images.
 * This reposutory is oudated (R1-RC1)
-* Erlach latest version hosted on a domain [erlach.co](https://erlach.co)
+* Erlach latest version hosted on a domain [erlach.co](https://erlach.co), [erlach6sjul42c7h.onion](http://erlach6sjul42c7h.onion/)
 
 ## Features
 
