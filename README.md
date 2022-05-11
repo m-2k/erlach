@@ -16,6 +16,8 @@
 * SPA
 * WebSocket
 
+![Screenshot](https://github.com/m-2k/erlach/blob/master/erlach.png?raw=true)
+
 ## Feedback
 
 * Twitter [@erlach_co](https://twitter.com/erlach_co) (abused and not available now)
