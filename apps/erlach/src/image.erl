@@ -1,6 +1,5 @@
 -module(image).
 -author('andy').
-
 -behaviour(gen_server).
 
 -compile(export_all).
@@ -9,9 +8,9 @@
 
 -define(EMAGICK_APP_ENV, [{magick_prefix, "gm"}]).
 
+
 %% Limit RAM and HDD options / Monitoring of memory using
 %% http://stackoverflow.com/questions/27458437/make-imagemagick-use-external-hdd-for-temporary-files
-
 
 convert_async({Mime, Ext}, Data, Path, Quality, SuccFun) ->
     ?MODULE:start_link(),
@@ -22,6 +21,7 @@ init(_Args) -> wf:info(?MODULE, "Started ~p", [self()]), {ok, []}.
 handle_call(_Message,_From,State) -> {reply,invalid_call_command,State}.
 
 handle_cast({convert, {{Mime, Ext}, Data, Path, Quality, SuccFun}},State) ->
+     % io:format("handle_cast :: convert~n"),
      Response = try
              {ok, Mime2, Converted} = convert({Mime, Ext}, Data, Quality),
              wf:info(?MODULE, "handle_cast ~p",[Path]),
@@ -36,7 +36,7 @@ terminate(Reason,_State) -> wf:warning(?MODULE,"Terminated ~p",[Reason]), ok.
 code_change(_OldVersion,State,_Extra) -> {ok,State}.
 
 test() ->
-    {ok, Jpg} = file:read_file("/tmp/image.jpg"),
+    {ok, Jpg} = file:read_file("/tmp/image/.jpg"),
     S1 = size(Jpg),
     {ok, [Jpg2]} = emagick:convert(Jpg, jpg, jpg, [
             {strip}, % remove profile info & metadata
@@ -54,6 +54,8 @@ test() ->
     S2 = size(Jpg2),
     file:write_file("/Users/m/compressed.jpg",Jpg2),
     {S1,S2}.
+    % {ok, Pdf} = file:read_file("/Users/m/Development/web/n2o-erlach-2/samples/deps/emagick/test/test.pdf"),
+    % emagick:convert(Pdf, pdf, png, [{density, 200}], [{magick_prefix, "gm"}]).
     
 
 mime_type(Binary) ->

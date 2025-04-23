@@ -17,43 +17,38 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](erlach-beta2.2-march-2015.png)
+![Screenshot](erlach-R1-broken-october-2015.png)
 
 
 ## Requirements
 
 * Unix
-* Erlang/OTP 17
+* Erlang/OTP 18
 * inotify-tools (optional for live code reload)
 
 ## Run Erlach
 
 1. Srart attached docker container
 ```sh
-docker pull erlang:17.5.6.4
-docker run --rm -it -p 8000:8000 -v "$(pwd)":/app -w /app erlang:17.5.6.4 bash
+docker pull erlang:18.3.3
+docker run --rm -it -p 8000:8000 -v "$(pwd)":/app -w /app erlang:18.3.3 bash
 ```
 2. Setup Git configuration into docker container and start Erlang app with REPL mode
 ```sh
 git config --system url."https://github.com/".insteadOf git://github.com/
 ```
 
-3. Patch list of Erlang applications which should be launched, file `./.applist`
-```sh
-sed -i 's/\[/[xmerl,/; s/,fs//; s/,active//' .applist
-```
-
-4. Get dependencies, compile and run Erlach with [mad](https://github.com/synrc/mad/tree/0.9)
+3. Get dependencies, compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
 ```sh
 ./mad deps compile repl
 ```
 
-5. Init Erlach database into ERTS terminal
+4. Init Erlach database into ERTS terminal
 ```erlang
-utils:init_db().
+erlach_db:init().
 ```
 
-6. Open URL [http://localhost:8000/](http://localhost:8000/) on host system
+5. Open URL [http://localhost:8000/](http://localhost:8000/) on host system
 
 
 ## Feedback

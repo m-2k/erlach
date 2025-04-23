@@ -1,9 +1,9 @@
 {application, erlach,
  [
-  {description, "Erlach"},
+  {description, "Erlach Imageboards Service"},
   {vsn, "1"},
   {registered, []},
-  {applications, [kernel, stdlib, n2o, kvs, db, avz]},
-  {mod, { web_app, []}},
+  {applications, [kernel, stdlib, n2o, kvs, erlach_db]},
+  {mod, { erlach, []}},
   {env, []}
  ]}.

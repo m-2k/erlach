@@ -4,14 +4,9 @@
 
 -compile(export_all).
 -include_lib("n2o/include/wf.hrl").
--include_lib("kvs/include/kvs.hrl").
--include_lib("kvs/include/feed.hrl").
--include_lib("db/include/post.hrl").
--include_lib("db/include/attachment.hrl").
+-include_lib("nitro/include/nitro.hrl").
 
--include_lib("db/include/board.hrl").
--include_lib("db/include/thread.hrl").
--include_lib("db/include/user.hrl").
+-include_lib("erlach_db/include/erlach_db.hrl").
 -include("erlach.hrl").
 -include("style.hrl").
 
@@ -26,7 +21,6 @@ message(Message, Class) ->
             body=guard:html_escape(Message)}),
     wf:wire(wf:f("window.setTimeout(function(){var a=qi('~s'); if(a){a.onclick();}},~b);",[Id,size(wf:to_binary(Message))*100+4000])),
     ok.
-    % wf:wire(wf:f("var m=qi('~s');m.style.webkitAnimationName=m.style.animationName='popup-slide-left';", [Id])).
 
 title(_Module, ?ACTION_API) ->
     Text = case {Level,Action} of
@@ -52,7 +46,7 @@ menu(User) ->
             end ]},
         #panel{class= <<"links left">>,body=[
             #link {class=Class, href= <<"#">>, body= <<"News">>},
-            #link {class=Class, href=qs:ml({board,blog,<<"e">>}), body= <<"Blog">>} ]} ].
+            #link {class=Class, href=erlach_qs:ml({board,blog,<<"e">>}), body= <<"Blog">>} ]} ].
 
 
 gettype() -> ?CTX#cx.path#route.type.
@@ -69,36 +63,42 @@ breadcrumbs2(?ACTION_API) ->
 breadcrumbs(?ACTION_API) ->
     Type = gettype(),
     Class = <<"link slim">>,
-    Main = #link{class=Class,body= <<"Эрлач"/utf8>>,href=qs:ml(root) },
+    % Separator = #link{class= <<"link unicode nolink">>,body= <<"⚡"/utf8>>},
+
+    % TODO: remove after change ACTION_API to #record with Group variable
+    {board,Gid} = Board#board.feed_id,
+    {ok,#group{name=Gname}}=kvs:get(group,Gid),
+    Root = #link{class= <<Class/binary," nolink">>,body=Gname},
     
     wf:info(?MODULE, "BreadCrumbs: ~p",[Type]),
     
     Body = case {Level,Action,Type} of
-        {thread,_,blog} -> [Main,
-            #link{class=Class,body=Board#board.name,href=qs:ml({board,thread,Board#board.uri})},
-            #link{class=Class,body= <<"Блог"/utf8>>,href=qs:ml({board,Type,Board#board.uri})}];
-        {thread,_,_} -> [Main,#link{class=Class,body=Board#board.name,href=qs:ml({board,thread,Board#board.uri})}];
-        {board,view,blog} -> [Main,#link{class= <<Class/binary," nolink">>,body= <<"Блог"/utf8>>}];
-        {board,view,_} -> [Main]
+        {thread,_,blog} -> [Root,
+            #link{class=Class,body=Board#board.name,href=erlach_qs:ml({board,thread,Board#board.uri})},
+            #link{class=Class,body= <<"Блог"/utf8>>,href=erlach_qs:ml({board,Type,Board#board.uri})}];
+        {thread,_,_} -> [Root,#link{class=Class,body=Board#board.name,href=erlach_qs:ml({board,thread,Board#board.uri})}];
+        {board,view,blog} -> [Root,#link{class= <<Class/binary," nolink">>,body= <<"Блог"/utf8>>}];
+        {board,view,_} -> [Root]
     end,
     #panel{class= <<"breadcrumbs center">>,body=Body}.
 
 footer() ->
-    Class=?FOOTER_LINKS,
+    ExtClass=?FOOTER_LINKS,
+    IntClass= <<"button int warning alpha slim">>,
     #panel{id= <<"footer">>,body = [
         #panel{class= <<"related-links">>,body=[
-            #link{class=Class, target="_blank", body= <<"Erlang Powered">>, href= <<"http://erlang.org">>},
-            #link{class=Class, target="_blank", body= <<"SynRC">>, href= <<"https://synrc.com">>},
-            #link{class=Class, target="_blank", body= <<"EoX">>, href= <<"http://erlangonxen.org">>},
-            #link{class=Class, target="_blank", body= <<"Tails">>, href= <<"https://tails.boum.org">>},
-            #link{class=Class, target="_blank", body= <<"Tor">>, href= <<"https://www.torproject.org">>},
-            #link{class=Class, target="_blank", body= <<"Digital Ocean">>, href= <<"https://digitalocean.com">>},
-            #link{class=Class, target="_blank", body= <<"N2O">>, href= <<"https://github.com/5HT/n2o">>},
-            #link{class=Class, target="_blank", body= <<"Cowboy">>, href= <<"https://github.com/ninenines/cowboy">>},
-            #link{class=Class, target="_blank", body= <<"NoSQL">>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
-            #link{class=Class, target="_blank", body= <<"BPG Ready">>, href= <<"http://bellard.org/bpg/">>},
-            #link{class=Class, target="_blank", body= <<"Markdown">>, href= <<"https://help.github.com/articles/markdown-basics/">>},
-            #link{class=Class, body= <<"Erlach IBS, 2015"/utf8>>, href= <<"/privacy">>}
+            #link{class=ExtClass, target="_blank", body= <<"Erlang Powered➲"/utf8>>, href= <<"http://erlang.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"EoX➲"/utf8>>, href= <<"http://erlangonxen.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"Tails➲"/utf8>>, href= <<"https://tails.boum.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"Tor➲"/utf8>>, href= <<"https://www.torproject.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"Digital Ocean➲"/utf8>>, href= <<"https://digitalocean.com">>},
+            #link{class=ExtClass, target="_blank", body= <<"Cowboy➲"/utf8>>, href= <<"https://github.com/ninenines/cowboy">>},
+            #link{class=ExtClass, target="_blank", body= <<"NoSQL➲"/utf8>>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
+            #link{class=ExtClass, target="_blank", body= <<"BPG Ready➲"/utf8>>, href= <<"http://bellard.org/bpg/">>},
+            #link{class=ExtClass, target="_blank", body= <<"Markdown➲"/utf8>>, href= <<"https://help.github.com/articles/markdown-basics/">>},
+            #link{class=IntClass, body= <<"Privacy"/utf8>>, href= <<"/privacy">>},
+            #link{class=IntClass, body= <<"Terms"/utf8>>, href= <<"/terms">>},
+            #link{class=IntClass, body= <<"About Erlach"/utf8>>, href= <<"/about">>}
         ]}
     ]}.
 
@@ -174,11 +174,12 @@ posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread,Access) ->
     
     case kvs:get(feed, {post, Tid}) of
         {ok, F} ->
-            AllPosts = kvs:traversal(post, F#feed.top, F#feed.entries_count, #iterator.prev),
+            AllPosts = kvs:traversal(post, F#feed.top, F#feed.count, #iterator.prev),
             {Head, Posts} = lists:foldl(fun(P, {H,Acc}) ->
                 case {H,P#post.head,post(Thread,P,IsAdmin,Uid,Access)} of
                     {undefined,true, {ok, Html}} -> {Html,Acc};  % first head post
                     {_,        false,{ok, Html}} -> {H,[Html|Acc]}; % message posts
+                    % {_,{skip, access}} -> {H,Acc};
                     _ -> {H,Acc}
                 end end, {undefined,[]}, AllPosts),
             {ok, Head, Posts};
@@ -201,14 +202,16 @@ post_check_visibility(Uid,IsModerate,#thread{type=ThType,request_to=ReqTo},#post
 post(#post{feed_id={post,Tid}}=P) ->
     {ok, Thread} = kvs:get(thread,Tid),
     post(Thread,P, u:is_admin(),u:id(),erlang:get(access)).
-post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,Access) ->    
+post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu,deleted=ThreadDeleted}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,Access) ->    
     IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
-    Text = utils:html_message(Post),
+    Text = erlach_utils:html_message(Post),
     
     IsSelfPost = User =:= Uid,
+    
     CanDelete = IsSelfPost orelse access:is_allow(message,moderate,Access),
     CanRestore = access:is_allow(message,moderate,Access),
-    CanEdit = IsSelfPost andalso not utils:expired(Timestamp,config:expire_time_to_edit_messages()),
+    CanEdit = IsSelfPost andalso (access:is_allow(thread,moderate,Access)
+        orelse not erlach_utils:expired(Timestamp,config:expire_time_to_edit_messages())),
 
     Uid = u:id(),
     IsModerate = case {Tu,User} of {Uid,_} -> true; {_,Uid} -> true; _ -> false end,
@@ -217,46 +220,52 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
     case {post_check_visibility(Uid,IsModerate,Thread,Post),Deleted} of
         {ok,undefined} ->
             Class = if IsBlog -> <<"thread-blog">>; true -> <<"thread-post">> end,
-            ReplyId = utils:hex_id({reply,Id}),
-            Html = #panel { id = utils:hex_id({post,Id}), class = Class, body = [
-                    case {CanDelete, IsHead} of
-                        {true, true} -> #link{ class = <<"link danger compact">>, body = <<"Delete thread">>, postback = {hide_thread, Tid} };
-                        {true, _} -> #link{ class = <<"link danger compact">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
-                        _ -> [] end,
-                    case CanEdit of true -> %html:error(wf:to_list(Id)),
-                        #link{ class = <<"link info compact">>, body = <<"✎"/utf8>>, postback = {edit_post, Id} }; _ -> [] end,
-                    case ThreadType of
-                        request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
-                            
-                            case u:id() of
-                                User -> []; % ignore self messages
-                                _ ->
-                                    % wf:warning(?MODULE,"JOIN: ~p ~p",[get(access),u:check_access(User,ReqTo)]),
-                                    {Level,Lid} = ReqTo,
-                                    case access:acl({{user,User}, {private,Level,Lid}}) of
-                                        {_Time1,_Time2} -> [];
-                                        _ -> #link{class= <<"button success">>,
-                                            body= "Join user " ++ wf:to_list(User) ++ " to " ++ wf:to_list(ReqTo),
-                                            postback = {request, accepted, ReqTo, User, Id} } end end;
-                        _ -> []
-                    end,
-                    case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
-                        anonymous -> <<"anonymous">>;
-                        Uname -> guard:html_escape(Uname) end } end,
-                    #span{ class = <<"message">>, body = Text },
-                    #link{ id=ReplyId, class = <<"reply link primary compact">>, body = <<"↩"/utf8>>, data_fields=[{<<"data-id">>,wf:to_integer(Id)}] },
-                    #panel{ class = <<"post-attachment">>, body = post_attachment(Post) }
-                %    ]}
+            ReplyId = erlach_utils:hex_id({reply,Id}),
+            Html = #panel { id = erlach_utils:hex_id({post,Id}), class = Class, body = [
+                case IsHead of
+                    true ->
+                        CanDeleteThread = IsSelfPost orelse access:is_allow(thread,moderate,Access),
+                        CanRestoreThread = access:is_allow(thread,moderate,Access),
+                        case {ThreadDeleted,CanDeleteThread,CanRestoreThread} of
+                            {true,_,true} -> #link{class= <<"link success compact">>,body= <<"Restore thread">>,postback={show_thread,Tid}};
+                            {_,true,_} -> #link{class= <<"link danger compact">>,body= <<"Delete thread">>,postback={hide_thread,Tid}};
+                            _ -> [] end;
+                    _ ->
+                        case CanDelete of
+                            true -> #link{ class = <<"link danger compact">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
+                            _ -> []
+                        end end,
+                case CanEdit of true ->
+                    #link{ class = <<"link info compact">>, body = <<"✎"/utf8>>, postback = {edit_post, Id} }; _ -> [] end,
+                case ThreadType of
+                    request when ReqTo =/= undefined andalso IsModerate =:= true -> % andalso IsAdmin =:= true
+                        
+                        case u:id() of
+                            User -> []; % ignore self messages
+                            _ ->
+                                {Level,Lid} = ReqTo,
+                                case access:acl({{user,User}, {private,Level,Lid}}) of
+                                    {_Time1,_Time2} -> [];
+                                    _ -> #link{class= <<"button success">>,
+                                        body= "Join user " ++ wf:to_list(User) ++ " to " ++ wf:to_list(ReqTo),
+                                        postback = {request, accepted, ReqTo, User, Id} } end end;
+                    _ -> []
+                end,
+                case IsHead of true -> []; _ -> #span{ class = <<"username">>, body = case Post#post.user_name of
+                    anonymous -> <<"anonymous">>;
+                    Uname -> guard:html_escape(Uname) end } end,
+                #span{ class = <<"message">>, body = Text },
+                #link{ id=ReplyId, class = <<"reply link primary compact">>, body = <<"↩"/utf8>>,
+                    data_fields=[{<<"data-id">>,wf:to_integer(Id)}],
+                    onclick= <<"set_reply(this);">>
+                    },
+                #panel{ class = <<"post-attachment">>, body = post_attachment(Post) }
                 ]},
-                Wire = "qi(\"reply-"++utils:hex_id(Id)++"\").addEventListener(\"click\", function(e) {"++
-                "var message = qi(\"message\"); message.value = message.value + \">>\" + this.dataset.id + \" \";});",
-                wf:info(?MODULE,"bind post: ~p",[Wire]),
-                wf:wire(Wire),
             {ok, Html};
         {ok,_} ->
             case CanRestore of
                 true ->
-                    Html = #panel { id = utils:hex_id({post,Id}), class = <<"thread-post">>, body = [
+                    Html = #panel { id = erlach_utils:hex_id({post,Id}), class = <<"thread-post">>, body = [
                             case IsHead of
                                 true -> #link{ class = <<"link success compact">>, body = <<"Restore thread">>, postback = {show_thread, Tid} };
                                 _ -> #link{ class = <<"link success compact">>, body = <<"⟳"/utf8>>, postback = {show_post, Id} }
@@ -276,7 +285,7 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
 post_attachment(#post{ id=Id } = _P) ->
     case kvs:get(feed, {attachment, Id}) of
         {ok, F} ->
-            Attachments = kvs:traversal(attachment, F#feed.top, F#feed.entries_count, #iterator.prev),
+            Attachments = kvs:traversal(attachment, F#feed.top, F#feed.count, #iterator.prev),
             lists:map(fun(A) ->
                 #image{ image = "/" ++ A#attachment.path, class = <<"image">> }
                 end, lists:reverse(Attachments));
@@ -299,13 +308,13 @@ board_body_private({Access, Board, Thread, {board, Action, Data}}=S) ->
                 case Board#board.request_thread of
                     undefined -> [];
                     Tid -> #link{class= <<"button success">>, body= <<"Make request for access to this board">>,
-                        url=qs:ml({thread, gettype(), Board#board.uri, Tid}) }
+                        url=erlach_qs:ml({thread, gettype(), Board#board.uri, Tid}) }
                 end ]})
     end.
 
 board_body({Access, #board{id=Bid,uri=Uri,feed_id=Bf,name=Name,description=Description,category=Cat}=Board, Thread, {board, Action, {Type,Bid}=Data}}=S) ->
     
-    TeenGid = 9,
+    TeenGid = 5,
     if Bf =:= {board,TeenGid} -> html:info(wf:to_list(<<"Единый телефон доверия психологической помощи: 8-800-2000-122"/utf8>>)); true -> ok end,
     
     Route=?CTX#cx.path,
@@ -319,22 +328,22 @@ board_body({Access, #board{id=Bid,uri=Uri,feed_id=Bf,name=Name,description=Descr
     Head = [ #panel{class= <<"content-title">>,body=Name}, #span{class= <<"remark">>,body=Description} ],
     Manage = #panel{class= <<"center">>,body=[
         case Data of
-            {thread, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Blog">>, href=qs:ml({board,blog,Uri}) },
+            {thread, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Blog">>, href=erlach_qs:ml({board,blog,Uri}) },
                 if AllowMessage -> #link{class = <<"button primary slim">>, body = <<"New">>,
                     postback={thread, create, {thread, Bid}} }; true -> [] end ];
-            {blog, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Threads">>, href=qs:ml({board,Uri}) },
+            {blog, _Bid} -> [ #link{class = <<"button dark slim">>, body = <<"Threads">>, href=erlach_qs:ml({board,Uri}) },
                 if AllowBlog -> #link{class = <<"button primary slim">>, body = <<"New blog">>,
                     postback={thread, create, {blog, Bid}} }; true -> [] end ] end,
         if AllowRequest ->
             case Board#board.request_thread of
                 undefined -> #link{class= <<"button info slim">>, body= <<"New request">>,postback={thread, create, {request, {board, Bid}}}};
-                Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=qs:ml({thread,gettype(),Uri,Rtid}) }
+                Rtid -> #link{class= <<"button success slim">>, body= <<"View request">>, href=erlach_qs:ml({thread,gettype(),Uri,Rtid}) }
             end; true -> [] end,
         lists:map(fun({Cid,Ctext}) ->
             Class = case Route#route.category =:= wf:to_binary(Cid) of
                 true -> <<"button lime slim selected">>;
                 _ -> <<"button lime slim">> end,
-            #link{class=Class,body=wf:to_binary(Ctext),href=qs:ml({category,Type,Uri,Cid})}
+            #link{class=Class,body=wf:to_binary(Ctext),href=erlach_qs:ml({category,Type,Uri,Cid})}
             end,Cat) ]},
     Main = #panel{id= <<"threads">>, class= <<"line">>, body=board_content(S)},
     Settings = case u:is_admin() of true -> settings_panel(board, Board); _ -> [] end,
@@ -347,33 +356,34 @@ board_content({Access, #board{id=Bid}=Board, Thread, {board, Action, Data}}=S) -
     case kvs:get(feed, {thread, Bid}) of
         {ok, TF} ->
             wf:info(?MODULE, "body feed ~p", [TF]),
-            Threads = kvs:traversal(thread, TF#feed.top, TF#feed.entries_count, #iterator.prev),
+            Threads = kvs:traversal(thread, TF#feed.top, TF#feed.count, #iterator.prev),
             {HeadPostList3, HeadBlogList2,RequestHeadPostList2} = lists:foldl(fun(T, {PL, BL, RL}) ->
-                {ok, #post{type=Type}=P} = kvs:get(post, T#thread.head_post),
+                    {ok, #post{type=Type}=P} = kvs:get(post, T#thread.head_post),
 
-                % TODO: Last post must overwrite #thread.last_post_date
-                {ok, #feed{top=LastPostId}} = kvs:get(feed, {post, T#thread.id}),
-                {ok, #post{created=LastTimestamp}} = kvs:get(post, LastPostId),
+                    % TODO: Last post must overwrite #thread.last_post_date
+                    {ok, #feed{top=LastPostId}} = kvs:get(feed, {post, T#thread.id}),
+                    {ok, #post{created=LastTimestamp}} = kvs:get(post, LastPostId),
                         
-                case {is_exist_in_category(T,Route#route.category), T#thread.type} of
-                    {true,thread} -> {[{LastTimestamp,T,P}|PL], BL, RL};
-                    {true,blog} -> {PL, [{T,P}|BL], RL};
-                    {true,request} -> {PL, BL, [{T,P}|RL]};
-                    _ -> {PL, BL, RL}
-                end
+                    case {is_exist_in_category(T,Route#route.category), T#thread.type} of
+                        {true,thread} -> {[{LastTimestamp,T,P}|PL], BL, RL};
+                        {true,blog} -> {PL, [{T,P}|BL], RL};
+                        {true,request} -> {PL, BL, [{T,P}|RL]};
+                        _ -> {PL, BL, RL}
+                    end
+                % (_,{PL, BL, RL}) -> {PL, BL, RL} % skipping deleted threads
             end,{[],[],[]},Threads),
             wf:info(?MODULE, "Head post list: ~p", [HeadPostList3]),
 
             case Data of
                 {blog, _Bid} -> #panel{ body = [
-                        lists:map(fun({T,P}) -> html_thread(Board,T,P) end, lists:reverse(HeadBlogList2))
+                        lists:map(fun({T,P}) -> html_thread(Access,Board,T,P) end, lists:reverse(HeadBlogList2))
                     ]};
                 {thread, _Bid} ->
                     % Bump sorting TODO: inject thread-element to top in feed when post written
                     SortedPostList = lists:sort(fun({TS1,_T1,_P1},{TS2,_T2,_P2}) -> TS1 >= TS2 end, HeadPostList3),
 
                     #panel{ body = [
-                        lists:map(fun({_LastTimestamp,T,P}) -> html_thread(Board,T,P) end, SortedPostList)
+                        lists:map(fun({_LastTimestamp,T,P}) -> html_thread(Access,Board,T,P) end, SortedPostList)
                     ]}
             end;
         _Empty -> []
@@ -384,22 +394,31 @@ is_exist_in_category(#thread{category=Categories},RouteCategory) ->
     lists:any(fun(E) -> E =:= RouteCategory end,lists:map(fun(C)-> wf:to_binary(C) end,Categories)).
 
 
-html_thread(#board{uri=Uri},#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#post{message=Message,created=_Timestamp,user=User,head=IsHead,markup=Markup}=Post) ->
+html_thread(Access,#board{uri=Uri},#thread{id=Id,name=Topic,type=ThreadType,deleted=Deleted}=_Thread,#post{message=Message,created=_Timestamp,user=User,head=IsHead,markup=Markup}=Post) ->
     
-    IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
-    Class = case IsBlog of true -> <<"board-blog">>; _ -> <<"board-thread">> end,
-    Text = utils:html_message(Post),
+    CanRestore = access:is_allow(thread,moderate,Access),
     
-    #panel {id=utils:hex_id({thread,Id}),class=Class,body=[
-            #panel{class= <<"thread-topic">>,body=[
-                #link{class= <<"link">>,
-                    body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
-                    href=qs:ml({thread,gettype(),Uri,Id})}
-            ]},
-            case IsBlog of true -> []; _ -> #span{class= <<"username">>,body= <<"anonymous">>} end,
-            #span{class= <<"message">>,body=Text},
-            #panel{class= <<"post-attachment">>,body=html:post_attachment(Post)}
-        ]}.
+    case {Deleted,CanRestore} of
+        {true,false} -> [];
+        Mod ->
+            IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
+            Class = case IsBlog of true -> <<"board-blog">>; _ -> <<"board-thread">> end,
+            Text = erlach_utils:html_message(Post),
+    
+            #panel {id=erlach_utils:hex_id({thread,Id}),class=Class,body=[
+                    case Mod of
+                        {true,true} -> #link{class= <<"button warning nolink">>,body= <<"Deleted">>};
+                        _ -> [] end,
+                    #panel{class= <<"thread-topic">>,body=[
+                        #link{class= <<"link">>,
+                            body=case guard:html_escape(Topic) of <<>> -> wf:f("#~w",[Id]); T -> T end,
+                            href=erlach_qs:ml({thread,gettype(),Uri,Id})}
+                    ]},
+                    case IsBlog of true -> []; _ -> #span{class= <<"username">>,body= <<"anonymous">>} end,
+                    #span{class= <<"message">>,body=Text},
+                    #panel{class= <<"post-attachment">>,body=html:post_attachment(Post)}
+                ]}
+    end.
 
 settings_panel(board, #board{}=B) ->
     #panel { body = [

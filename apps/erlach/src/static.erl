@@ -4,8 +4,8 @@
 
 -compile(export_all).
 -include_lib("n2o/include/wf.hrl").
--include_lib("db/include/post.hrl").
--include_lib("db/include/thread.hrl").
+-include_lib("erlach_db/include/erlach_db.hrl").
+-include_lib("nitro/include/nitro.hrl").
 -include("erlach.hrl").
 
 -define(PRIVACY_POST_ID, 1).
@@ -28,7 +28,7 @@ body() ->
                     [ #panel{class= <<"content-title">>,body=Topic},
                         #panel{id=posts,body=[Html]},
                         #panel{class= <<"center">>,body=[
-                            #link{class= <<"button primary">>, href=qs:ml({thread,blog,qs:board_id_to_uri(Bid),Tid}),
+                            #link{class= <<"button primary">>, href=erlach_qs:ml({thread,blog,erlach_qs:board_id_to_uri(Bid),Tid}),
                                 body= <<"View thread">>} ]} ];
                 _ -> [] end;
         _ -> []

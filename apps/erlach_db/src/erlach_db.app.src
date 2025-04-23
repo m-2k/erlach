@@ -1,0 +1,9 @@
+{application, erlach_db,
+  [
+    {description, "Erlach Storage"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib, kvs]},
+    {mod, { erlach_db, []}},
+    {env, []}
+  ]}.

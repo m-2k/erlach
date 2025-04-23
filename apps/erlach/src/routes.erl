@@ -1,62 +1,31 @@
 -module(routes).
 -author('andy').
 -include_lib("n2o/include/wf.hrl").
--export([init/2, finish/2]).
-
+-export([init/2, finish/2, route/1]).
 -include("erlach.hrl").
-
-%% U can use default dynamic routes or define custom static as this
-%% Just put needed module name to sys.config:
-%% {n2o, [{route,routes}]}
-%% Also with dynamic routes u must load all modules before starting Cowboy
-%% [code:ensure_loaded(M) || M <- [index, login, ... ]]
 
 finish(State, Ctx) -> {ok, State, Ctx}.
 
 init(State, Ctx) ->
     Req=Ctx#cx.req,
-    
-    {Bindings,_}=cowboy_req:bindings(Req),
-    wf:info(?MODULE,"ROUTE Bindings: ~p",[Bindings]),
-    
     {Q1,_}=cowboy_req:binding(q1,Req),
     {Q2,_}=cowboy_req:binding(q2,Req),
-    {Q3,_}=cowboy_req:binding(q3,Req),
-    
-    Route = case static(Q1) of
-        undefined -> dinamic(Q1,Q2,Q3);
-        #route{}=R -> R;
-        Static -> #route{module=Static} end,
-    wf:info(?MODULE,"ROUTE: ~p",[Route]),
+    Route=route(#query{q1=Q1,q2=Q2}),
+    wf:info(?MODULE,"ROUTE: ~p ~p ~p ~p",[wf:path(Req),Q1,Q2,Route]),
     {ok, State, Ctx#cx{path=Route,module=Route#route.module}}.
 
-% /g/                     -> board
-% /g/blog                 -> board:blog
-% /g/blog/new
-% /g/new
-% /g/:category-1          -> board&cat
-% /g/blog/:category-1     -> board:blog&cat
-% /g/blog/AB68            -> thread:blog
-% /g/AB68/                -> thread
+route(#query{q1=Q1,q2=Q2}=Q) ->
+    R=route(Q1,Q2),
+    R#route{query=Q}.
+
+
+% /br/                    -> board
+% /br/thread              -> board:blog
+% /br/:category-1         -> board&cat
+% /br/AB68/               -> thread
 
 % /:BOARD/(:CAT|:TYPE|:NEW|:THREAD)/(:CAT|:THREAD)/
 
-dinamic(Board,undefined,undefined)               -> #route{module=board,board=Board,type=thread};
-dinamic(Board,<<"blog">>,undefined)              -> #route{module=board,board=Board,type=blog};
-dinamic(Board,<<"blog">>,<<"new">>)              -> #route{module=thread,board=Board,type=blog};
-dinamic(Board,<<"new">>,undefined)               -> #route{module=thread,board=Board,type=thread};
-dinamic(Board,<<$:,Category/binary>>,undefined)  -> #route{module=board,board=Board,type=thread,category=Category};
-dinamic(Board,<<"blog">>,<<$:,Category/binary>>) -> #route{module=board,board=Board,type=blog,category=Category};
-dinamic(Board,<<"blog">>,Thread)                 -> #route{module=thread,board=Board,type=blog,thread=Thread};
-dinamic(Board,Thread,undefined)                  -> #route{module=thread,board=Board,type=thread,thread=Thread};
-dinamic(_,_,_) -> root.
-    
-
-static(undefined)         -> root;
-static(<<"privacy">>)     -> #route{module=static,option=privacy};
-static(<<"terms">>)       -> #route{module=static,option=terms};
-static(<<"about">>)       -> #route{module=static,option=about};
-static(<<"donate">>)      -> donate;
-static(<<"profile">>)     -> profile;
-static(<<"favicon.ico">>) -> static_file;
-static(_) -> undefined.
+route(?UNDEF,?UNDEF) -> #route{module=?SPA,render=erlach_main};
+route(Board,?UNDEF) -> #route{module=?SPA,render=erlach_board,board=Board};
+route(Board,Thread) -> #route{module=?SPA,render=erlach_thread,board=Board,thread=Thread}.

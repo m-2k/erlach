@@ -4,14 +4,9 @@
 
 -compile(export_all).
 -include_lib("n2o/include/wf.hrl").
--include_lib("kvs/include/kvs.hrl").
--include_lib("kvs/include/feed.hrl").
--include_lib("db/include/post.hrl").
--include_lib("db/include/token.hrl").
--include_lib("db/include/attachment.hrl").
+-include_lib("nitro/include/nitro.hrl").
 
--include_lib("db/include/board.hrl").
--include_lib("db/include/user.hrl").
+-include_lib("erlach_db/include/erlach_db.hrl").
 -include("erlach.hrl").
 
 -ifndef(SESSION).
@@ -20,6 +15,7 @@
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
 main()    ->
+    wf:error(?MODULE, "MOT IMPLEMENTED",[]),
     _R = avz:callbacks([twitter]),
     #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {title,<<"Profile">>}]}.
 

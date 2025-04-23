@@ -4,43 +4,54 @@
 
 log_modules() ->
     [
-        % active,
-        % wf,
-        % % n2o_websocket,
-        % % n2o_document,
-        % n2o_query,
-        % n2o_bullet,
-        % % login,
-        % % n2o_dynalo,
-        % n2o_dynroute,
-        % n2o_nitrogen,
-        % root,
-        board,
-        thread,
-        % profile,
-        % % js_session2,
-        % % erlach_session,
-        % % n2o_nitrogen,
-        % n2o_event,
-        % % js_session,
-        % n2o_rails,
-        % kvs,
-        % twitter,
-        % avz,
+        % n2o_stream,
+        % n2o_proto,
+        % n2o_document,
+        % cowboy_websocket,
+
+        erlach,
+        erlach_qs,
+        erlach_spa,
+        erlach_main,
+        erlach_board,
+        erlach_thread,
+        erlach_event_router,
+        erlach_image,
+        
         % wf_convert,
-        % image,
-        % utils,
-        % u,
-        html,
-        % access,
-        routes,
-        % guard,
-        qs
-        % n2o_binary
+        % n2o_file,
+        n2o_async,
+        
+        ghjvkfhvghk
     ].
 
-log_level() -> warning.
+log_level() -> info.
 debug() -> false.
-info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).
+info() ->  spawn(fun()-> wf:info(hd(log_modules()),"~p",[mnesia:info()]) end).
+
+post_max_length() -> 2000.
+topic_max_length() -> 100.
 
 expire_time_to_edit_messages() -> 30*60. % 30 min
+
+render_preload_count(_) -> 10.
+render_part_count(_) -> 10.
+
+cowboy_nb_acceptors() -> 100.
+
+event_renders() -> [main,board,thread].
+
+password_length() -> 16.
+password_chars_allowed() ->
+    <<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?@#$%^&*()[]{}|:;<>">>.
+hash_algorithm() -> sha512.
+hash_delay() -> 0.
+salt_length() -> 4.
+salt_local() -> <<2,224,10,38>>.
+join_auth_key_length() -> 24.
+
+notification_read_timeout() -> 10000.
+
+filename(_Ftp) -> integer_to_list(erlang:unique_integer()).
+
+image_convert_timeout() -> 600000.
