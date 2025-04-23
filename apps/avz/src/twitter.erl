@@ -5,28 +5,12 @@
 -include_lib("kvs/include/user.hrl").
 
 -include_lib("db/include/user.hrl").
-% -include_lib("erlach/include/erlach.hrl").
 
 -compile(export_all).
 -export(?API).
 -define(CONSUMER_KEY, case application:get_env(avz, tw_consumer_key) of {ok, K} -> K;_-> "" end).
 -define(CONSUMER_SECRET, case application:get_env(avz, tw_consumer_secret) of {ok, S} -> S; _-> "" end).
 -define(CONSUMER, {?CONSUMER_KEY, ?CONSUMER_SECRET, hmac_sha1}).
-
-% registration_data(Props, twitter, Ori)->
-%     Id = proplists:get_value(<<"id_str">>, Props),
-%     UserName = binary_to_list(proplists:get_value(<<"screen_name">>, Props)),
-%     Email = email_prop(Props,twitter),
-%     Ori#user{   id = Email,
-%                 username = re:replace(UserName, "\\.", "_", [{return, list}]),
-%                 display_name = proplists:get_value(<<"screen_name">>, Props),
-%                 avatar = proplists:get_value(<<"profile_image_url">>, Props),
-%                 names = proplists:get_value(<<"name">>, Props),
-%                 email = Email,
-%                 surnames = [],
-%                 tokens = [{twitter,Id}|Ori#user.tokens],
-%                 register_date = erlang:now(),
-%                 status = ok }.
 
 registration_data(Props, twitter, Ori)->
 	% wf:info(?MODULE, "registration_data. Props:~p~n",[Props]),
@@ -35,11 +19,7 @@ registration_data(Props, twitter, Ori)->
     Email = email_prop(Props,twitter),
     Ori#user3{  id = kvs:next_id(user3, 1),
                 name = re:replace(UserName, "\\.", "_", [{return, list}]),
-                % display_name = proplists:get_value(<<"screen_name">>, Props),
-                % avatar = proplists:get_value(<<"profile_image_url">>, Props),
-                % names = proplists:get_value(<<"name">>, Props),
                 email = Email,
-                % surnames = [],
                 tokens = [{twitter,Id}|Ori#user3.tokens],
                 created = erlang:now() }.
 
@@ -49,16 +29,6 @@ email_prop(Props, twitter) -> proplists:get_value(<<"screen_name">>, Props).
 callback() ->
     Token = wf:q(<<"oauth_token">>),
     Verifier =wf:q(<<"oauth_verifier">>),
-    % User = wf:user(),
-    % wf:info(?MODULE, "Callback (twitter). User:~p~nToken:~p~nVerifier:~p",[User,Token,Verifier]),
-    %     Authorized = case User of
-    %     #user3{id={?T,_ID}} -> false;
-    %     #user3{} -> true;
-    %     _ -> false
-    % end,
-    %
-    % wf:info(?MODULE, "USER: Authorized:~p Is Temp: ~p",[Authorized,u:is_temp(User)]),
-    
 	case {u:is_temp(), Token, Verifier} of
 		{_, undefined, _} -> skip;
 		{_, _, undefined} -> skip;

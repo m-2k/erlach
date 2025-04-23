@@ -1,4 +1,5 @@
 -module(profile). %% MAIN PAGE / BOARDS LISTING
+-author('andy').
 -vsn('0.0.0').
 
 -compile(export_all).
@@ -18,7 +19,7 @@
 -endif.
 
 peer()    -> io_lib:format("~p",[wf:peer(?REQ)]).
-main()    -> % wf:redirect({http,<<"/sasay">>}).
+main()    ->
     _R = avz:callbacks([twitter]),
     #dtl{file="erlach",app=erlach,bindings=[{body,body()}, {title,<<"Profile">>}]}.
 
@@ -35,9 +36,6 @@ body() ->
             [ #panel{class= <<"content-title">>,body=Title },
                 html:username_form(),
                 #panel{body=[
-                % #panel{body=[#span{body= <<"Related accounts">>},acc_list()]},
-                % #panel{body=[#span{body= <<"Language">>},#span{body= <<"Default">>}]},
-                % #panel{body=[#span{body= <<"Time zone">>},#span{body= <<"Default">>}]}
                 ]} ]
     end,
     html:body([ case config:debug() of true -> #span{body= wf:f("User: ~p", [u:get()])}; _ -> [] end, Content]).

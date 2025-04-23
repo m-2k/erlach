@@ -1,5 +1,5 @@
 -module(erlach_session).
--author('Maxim Sokhatsky').
+-author('andy').
 -include_lib("n2o/include/wf.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 -export(?SESSION_API).

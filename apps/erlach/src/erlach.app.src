@@ -1,6 +1,6 @@
 {application, erlach,
  [
-  {description, "N2O VXZ Sample App"},
+  {description, "Erlach"},
   {vsn, "1"},
   {registered, []},
   {applications, [kernel, stdlib, n2o, kvs, db, avz]},

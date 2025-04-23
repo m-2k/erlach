@@ -39,7 +39,6 @@ login_button() -> #panel{class=["btn-group"], body=
     #link{id=loginfb, class=[btn, "btn-primary", "btn-large", "btn-lg"],
         body=[#i{class=[fa,"fa-facebook","fa-lg","icon-facebook","icon-large"]}, <<"Facebook">>],
            postback={facebook,loginClick}
-%    actions = "$('#loginfb').on('click', fb_login);"
              }}.
 
 sdk() ->

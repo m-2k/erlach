@@ -1,4 +1,5 @@
 -module(board). %% BOARD LISTENING
+-author('andy').
 -vsn('0.0.0').
 
 -compile(export_all).
@@ -44,19 +45,10 @@ init_state() ->
     end.
 
 
-% event({thread, create, {request, {board, Bid}}=Type}) ->
 event({thread, create, Type}=S) ->
     wf:info(?MODULE,"EVT: ~p",[S]),
-    % u:restricted_call(fun() ->
-        % case guard:to_integer(wf:qs(<<"id">>)) of
-            % undefined -> skip;
-            % Bid ->
-            #board{uri=Uri}=erlang:get(board),
-            
-            % wf:info(?MODULE, "Create thread: ~p",[html:gettype()]),
-            ?SESSION:set_param(thread, {thread, create, Type}), wf:redirect(qs:ml({thread,create,html:gettype(),Uri}));
-        % end;
-        % end end, {feature, admin});
+    #board{uri=Uri}=erlang:get(board),
+    ?SESSION:set_param(thread, {thread, create, Type}), wf:redirect(qs:ml({thread,create,html:gettype(),Uri}));
 event({apply_board, BID}) ->
     wf:info(?MODULE, "Apply event ~p", [wf:q(checkbox_anonymous)]),
     u:restricted_call(fun() ->

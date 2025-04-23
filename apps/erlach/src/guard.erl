@@ -1,4 +1,5 @@
 -module(guard).
+-author('andy').
 -compile(export_all).
 
 -ifndef(SESSION).

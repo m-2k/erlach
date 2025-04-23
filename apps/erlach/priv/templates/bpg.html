@@ -11,37 +11,16 @@
    <script type="text/javascript" src="/static/bpgdec8a.js"></script>
 </head>
 <body>
-	
-	<h1>BPG Decoding Demo</h1>
-	IMG tag:<br>
-	<img src="/static/out.bpg">
-	<p>
-	IMG tag with animated image:<br>
-	<img src="/static/cinemagraph-6.bpg">
-	<p>
-	Dynamic loading in a canvas:<br>
-	<canvas id="mycanvas11" width="512" height="512"></canvas>
-	
-	<!-- {{body}} -->
-
-<!--	<script>
-	(function ()
-	{
-	    var img11, canvas11, ctx11;
-
-	    canvas11 = document.getElementById("mycanvas11");
-	    ctx11 = canvas11.getContext("2d");
-
-	    img11 = new BPGDecoder(ctx11);
-	    img11.onload = function() {
-	        /* draw the image to the canvas */
-	        ctx11.putImageData(this.imageData, 0, 0);
-	    };
-	    img11.load("lena512color.bpg");
-	})();
-	</script>  -->
-
-<!--script>var transition = {pid: '', host: 'localhost', port:'8000'};</script-->
+  
+  <h1>BPG Decoding Demo</h1>
+  IMG tag:<br>
+  <img src="/static/out.bpg">
+  <p>
+  IMG tag with animated image:<br>
+  <img src="/static/cinemagraph-6.bpg">
+  <p>
+  Dynamic loading in a canvas:<br>
+  <canvas id="mycanvas11" width="512" height="512"></canvas>
 <script>{{script}}</script>
 <script src='/n2o/protocols/bert.js'></script>
 <script src='/n2o/protocols/binary.js'></script>

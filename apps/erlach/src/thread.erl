@@ -1,4 +1,5 @@
 -module(thread). % THREAD LISTENING / ADDING THREAD HEAD POST
+-author('andy').
 -vsn('0.2.0').
 
 -compile(export_all).
@@ -106,11 +107,8 @@ event({Store, finalize}) when Store =:= store orelse Store =:= edit ->
 
 event({request, accepted, {Level,Lid}=ReqTo, User, PostId}) ->
     wf:info(?MODULE, "Granting access to ~p for ~p", [ReqTo,User]),
-    % u:restricted_call(fun() ->
-            % wf:info(?MODULE, "Define access: ~p", [u:define_access(User,ReqTo,allow)]),
-            wf:info(?MODULE, "Define access: ~p", [access:define(User,private,Level,Lid,infinity,infinity)]),
-            update_post(PostId),
-        % end, {feature,admin}),
+    wf:info(?MODULE, "Define access: ~p", [access:define(User,private,Level,Lid,infinity,infinity)]),
+    update_post(PostId),
     ok;
     
 event({server,{add, post, #post{id=Pid}=Post, Self}}) ->
@@ -124,7 +122,6 @@ event({server,{add, post, #post{id=Pid}=Post, Self}}) ->
                 _ -> ok end,
             erlang:put(?NEWEST_POSTS,[Pid|Newest]),
             wf:info(?MODULE, "NEWEST_POSTS: ~p",[erlang:get(?NEWEST_POSTS)])
-            % add_post(Id)
     end;
 
 event(load_newest_posts) ->

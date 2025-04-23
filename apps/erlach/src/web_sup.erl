@@ -1,4 +1,6 @@
 -module(web_sup).
+-author('andy').
+
 -behaviour(supervisor).
 -export([start_link/0, init/1]).
 -compile(export_all).
@@ -7,13 +9,6 @@
 -define(APP, erlach).
 
 start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-
-% start_child(Name) ->
-% 	case whereis(Name) of
-% 		P when is_pid(P) -> already_started;
-% 		_ -> supervisor:start_child(?MODULE,{Name,{Name,start_link,[]},transient,1000,worker,[Name]})
-% 	end.
 
 init([]) ->
 
@@ -25,10 +20,7 @@ init([]) ->
 
     kvs:join(),
     qs:init(),
-    % case kvs:get(board,1) of {ok, _} -> ok; _ -> utils:init_db() end,
-	
-	% start_child(image),
-	% supervisor:start_child(web_sup, {image, {image, start_link, []}, transient,1000,worker,[image]}),
+    
 	ChildSpec = {image, {image, start_link, []}, permanent,1000,worker,[image]},
     {ok, {{one_for_one, 5, 10}, [ChildSpec]}}.
 

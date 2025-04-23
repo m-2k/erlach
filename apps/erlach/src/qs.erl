@@ -1,4 +1,5 @@
 -module(qs).
+-author('andy').
 -compile(export_all).
 
 -include("erlach.hrl").

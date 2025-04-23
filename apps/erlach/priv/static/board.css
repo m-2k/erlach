@@ -91,17 +91,6 @@ a.lime.alpha { background-color: rgba(207, 255, 5, 0.6); }
 a.menu { color: #26c6da; background-color: transparent; text-transform: capitalize; }
 a.menu:hover:after { position: absolute; content: '!'; }
 
-/*a.breadcrumbs {
-    color: #26c6da;
-    background-color: transparent;
-    text-transform: capitalize;
-    padding-left: 2px;
-    padding-right: 2px;
-}
-a.breadcrumbs.nolink { color: rgba(0, 184, 212, 0.4); cursor: default; }
-a.breadcrumbs:hover { }
-*/
-
 a.girl { background-color: #f4489a; } 
 a.girl.alpha { background-color: rgba(244, 72, 154, 0.6); }
 
@@ -110,9 +99,6 @@ a.nohover:hover { cursor:default; }
 a.link {
 	color: #26c6da;
 	background-color: transparent;
-/*    text-transform: capitalize;
-    padding: 0px;
-    margin: 0px;*/
 }
 a.nolink { color: rgba(0, 184, 212, 0.4); cursor: default; }
 
@@ -179,13 +165,6 @@ input[type=text]:focus {
 	box-sizing: border-box;
 }
 .group > span { display: block; padding-left: 6px; text-transform: uppercase; margin-bottom: 10px; }
-/*.container > div {
-	float: left;
-	background-color: #ccc;
-	-webkit-flex-grow:1;
-}*/
-/*.container div:first-child { background-color: #090; }*/
-/*.container div:last-child { background-color: #c00; }*/
 
 
 @media screen and (max-width: 600px) {
@@ -197,21 +176,11 @@ input[type=text]:focus {
 
 /**************** profile ******************/
 .flex-horizontal {
-/*    border: solid 1px green;*/
 	display: flex; display: -webkit-flex;
-/*	flex-flow: row wrap; -webkit-flex-flow: row wrap;*/
-/*	justify-content:center; -webkit-justify-content: center;*/
-/*	flex-direction:column-reverse; -webkit-flex-direction:column-reverse;*/
-	
-/*	margin-top: 20px;*/
 }
 .flex-vertical {
-/*    border: dotted 1px black;*/
 	display: flex; display: -webkit-flex;
-/*	flex-flow: row wrap; -webkit-flex-flow: row wrap;*/
-/*	justify-content:center; -webkit-justify-content: center;*/
 	flex-direction:column; -webkit-flex-direction:column;
-/*	flex: 1 1 200px; -webkit-flex: 1 1 200px;*/
 }
 .flex-vertical .square {
 	background: #faa6c5;
@@ -221,11 +190,7 @@ input[type=text]:focus {
 	text-align: center;
 }
 .contact-modify-box {
-/*	flex: 1 1 auto; -webkit-flex: 1 1 auto;*/
-/*	justify-content:space-between; -webkit-justify-content: space-between;*/
 	flex-grow:1; -webkit-flex-grow:1; /* растягивание */
-/*    background: #aaf;*/
-	
 }
 /************** FLEXBOX END ****************/
 
@@ -283,7 +248,6 @@ body {
 	margin: 0px;
 	width:100%;
 	color: #777;
-/*	font-family: RobotoDraft, arial, sans-serif;*/
 	font-family: Helvetica;
 }
 
@@ -487,8 +451,6 @@ html {
 }
 
 #image-viewer-overlay {
-    /*display: none;*/
-    /*display: block;*/
     visibility: hidden;
     width: auto;
     height: auto;
@@ -596,7 +558,6 @@ html {
 /* >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> MIDDLE */
 #content {
     padding-top: 6px;
-/*    padding-top: 70px;*/ /* remove for breadcrumbs */
 	padding-bottom: 70px;
 	min-height:400px;
 }
@@ -681,28 +642,6 @@ body.glassy.donate, .glassy.donate #header::before, .glassy.donate #footer::befo
 
 
 
-/** {
-  margin: 0;
-  padding: 0;
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
-  box-sizing: border-box;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 12px;
-}*/
-
-/*body {
-  text-align: center;
-  background-color: #34495e;
-}*/
-/*
-h1 {
-  font-weight: 100;
-  font-size: 32px;
-  padding: 40px;
-  color: #fff;
-}*/
-
 /* Breadcrumb */
 /* http://codepen.io/firatcftc/pen/sHlnK */
 
@@ -710,11 +649,8 @@ h1 {
   list-style: none;
   display: inline-block;
 }
-/*.breadcrumb .icon {
-  font-size: 14px;
-}*/
+
 .breadcrumb li {
-/*  float: left;*/
   display: inline-block;
   
 }
@@ -729,27 +665,15 @@ h1 {
   padding: 0 10px 0 5px;
   text-align: center;
   margin-right: 23px;
-/*  outline: 1px solid #666;*/
-/*  border: 1px solid #666;*/
 }
-/*.breadcrumb li:nth-child(even) a { background-color: #2980b9; }
-.breadcrumb li:nth-child(even) a:before {
-  border-color: #2980b9;
-  border-left-color: transparent;
-}
-.breadcrumb li:nth-child(even) a:after { border-left-color: #2980b9; }*/
+
 .breadcrumb li:first-child a {
   padding-left: 15px;
-/*  -moz-border-radius: 4px 0 0 4px;*/
-/*  -webkit-border-radius: 4px;*/
   border-radius: 2px 0 0 2px;
-/*  outline: 1px solid #666; */
 }
 .breadcrumb li:first-child a:before { border: none; }
 .breadcrumb li:last-child a {
   padding-right: 15px;
-/*  -moz-border-radius: 0 4px 4px 0;*/
-/*  -webkit-border-radius: 0;*/
   border-radius: 0 2px 2px 0;
 }
 .breadcrumb li:last-child a:after { border: none; }

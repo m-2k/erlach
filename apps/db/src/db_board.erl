@@ -12,15 +12,15 @@ metainfo() ->
         ]}.
 
 new(Uri,Name,Description,GroupID,Categories,Hidden,Access) ->
-    kvs:add( #board{ id=kvs:next_id(board, 1),
-        created=erlang:now(),
-        uri=Uri,
-        name=Name,
-        user=0,
-        description=Description,
-        category=Categories,
-        hidden=Hidden,
-        feed_id={board, GroupID},
-        temporary=false,
-        access=Access
-        }).
+  kvs:add( #board{ id=kvs:next_id(board, 1),
+    created=erlang:now(),
+    uri=Uri,
+    name=Name,
+    user=0,
+    description=Description,
+    category=Categories,
+    hidden=Hidden,
+    feed_id={board, GroupID},
+    temporary=false,
+    access=Access
+    }).

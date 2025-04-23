@@ -1,4 +1,5 @@
 -module(root). %% MAIN PAGE / BOARDS LISTING
+-author('andy').
 -vsn('0.0.0').
 
 -compile(export_all).
@@ -24,7 +25,6 @@ body() ->
                     {ok,Bf} ->
                         Group=#panel{class= <<"inline">>,body=#link{class= <<"button light alpha nohover">>,title=Gdesc,body=Gname}},
                         Boards=lists:map(fun(#board{id=_Id,uri=Uri,name=Bname}) ->
-                            % #panel{class= <<"inline hint--right">>,data_fields=[{<<"data-hint">>,Bname}],body=[
                             #panel{class= <<"inline">>,body=[
                                 #link{class= <<"button dark alpha">>,title=Bname,href=qs:ml({board,Uri}),body=
                                     <<"/",(Uri)/binary,"/">> }]}

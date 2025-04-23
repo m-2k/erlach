@@ -1,4 +1,5 @@
 -module(u).
+-author('andy').
 -compile(export_all).
 
 -include_lib("n2o/include/wf.hrl").
@@ -12,10 +13,8 @@ new_user(SessionID) ->
     new_user(SessionID, calendar:local_time()).
 new_user(SessionID, Created) ->
     U = #user3{id={?T,SessionID},created=Created},
-    % wf:info(?MODULE, "TIME: ~p",[timer:tc(wf,user,[U])]),
-    % wf:info(?MODULE, "TIME: ~p",[timer:tc(ets,insert,[cookies,{{SessionID,?USER},U}])]),
     % ets:insert(cookies,{{SessionID,?USER},U}), % speed 5-6 ms
-    wf:user(U), % speed 6-9 ms
+    wf:user(U),                                  % speed 6-9 ms
     wf:wire(#transfer{events={server,{temp_user_created,U}}}),
     U.
 ensure_user() ->

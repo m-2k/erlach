@@ -1,4 +1,5 @@
 -module(html). %% HTML PARTS
+-author('andy').
 -vsn('0.0.0').
 
 -compile(export_all).
@@ -97,7 +98,6 @@ footer() ->
             #link{class=Class, target="_blank", body= <<"NoSQL">>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
             #link{class=Class, target="_blank", body= <<"BPG Ready">>, href= <<"http://bellard.org/bpg/">>},
             #link{class=Class, target="_blank", body= <<"Markdown">>, href= <<"https://help.github.com/articles/markdown-basics/">>},
-            % #link{class=Class, body= <<"Flex CSS">>, href= <<"http://pepelsbey.net/pres/flexbox-gotcha/?full#Cover">>},
             #link{class=Class, body= <<"Erlach IBS, 2015"/utf8>>, href= <<"/privacy">>}
         ]}
     ]}.
@@ -165,7 +165,6 @@ input_form({Access, Board, Thread, {Type, Action, Data}}=S) ->
 categories_selector(#board{category=Categories}) ->
     #panel{class= <<"category-selector">>,body=[
         lists:map(fun({Cid,Ctext}) ->
-            % #link{class= <<"button slim lime">>, body=C}
             #checkbox{id= <<"category-", (wf:to_binary(Cid))/binary>>,body=wf:to_list(Ctext)}
             end,Categories) ]}.
 
@@ -176,12 +175,10 @@ posts_list(#thread{id=Tid,type=Type,request_to=ReqTo}=Thread,Access) ->
     case kvs:get(feed, {post, Tid}) of
         {ok, F} ->
             AllPosts = kvs:traversal(post, F#feed.top, F#feed.entries_count, #iterator.prev),
-            % wf:wire(#transfer{state=[{items,AllPosts}]}),
             {Head, Posts} = lists:foldl(fun(P, {H,Acc}) ->
                 case {H,P#post.head,post(Thread,P,IsAdmin,Uid,Access)} of
                     {undefined,true, {ok, Html}} -> {Html,Acc};  % first head post
                     {_,        false,{ok, Html}} -> {H,[Html|Acc]}; % message posts
-                    % {_,{skip, access}} -> {H,Acc};
                     _ -> {H,Acc}
                 end end, {undefined,[]}, AllPosts),
             {ok, Head, Posts};
@@ -204,14 +201,9 @@ post_check_visibility(Uid,IsModerate,#thread{type=ThType,request_to=ReqTo},#post
 post(#post{feed_id={post,Tid}}=P) ->
     {ok, Thread} = kvs:get(thread,Tid),
     post(Thread,P, u:is_admin(),u:id(),erlang:get(access)).
-post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,Access) ->
-
-    % wf:info(?MODULE, " >>> html_post Message: ~p", [Message]),
-    
+post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=Id,type=PostType,feed_id ={post,Tid},temporary=IsTemp,message=Message, created=Timestamp,user=User,deleted=Deleted,head=IsHead,markup=Markup}=Post, IsAdmin,Uid,Access) ->    
     IsBlog = case {IsHead,ThreadType} of {true,blog} -> true; _ -> false end,
-    % {{_Y,_M,_D},{Hour,Minute,Second}} = calendar:now_to_local_time(Timestamp),
     Text = utils:html_message(Post),
-    % wf:info(?MODULE, " >>> html_post Converted message: ~p", [Text]),
     
     IsSelfPost = User =:= Uid,
     CanDelete = IsSelfPost orelse access:is_allow(message,moderate,Access),
@@ -219,9 +211,7 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
     CanEdit = IsSelfPost andalso not utils:expired(Timestamp,config:expire_time_to_edit_messages()),
 
     Uid = u:id(),
-    % wf:warning(?MODULE,"~n~n uids: ~p ~p",[Tu,User]),
     IsModerate = case {Tu,User} of {Uid,_} -> true; {_,Uid} -> true; _ -> false end,
-    % Access = get(access),
     V = post_check_visibility(Uid,IsModerate,Thread,Post),
     wf:info(?MODULE, " >>> html_post Visible: ~p", [V]),
     case {post_check_visibility(Uid,IsModerate,Thread,Post),Deleted} of
@@ -229,8 +219,6 @@ post(#thread{id=Tid,type=ThreadType,request_to=ReqTo,user=Tu}=Thread, #post{id=I
             Class = if IsBlog -> <<"thread-blog">>; true -> <<"thread-post">> end,
             ReplyId = utils:hex_id({reply,Id}),
             Html = #panel { id = utils:hex_id({post,Id}), class = Class, body = [
-                % #panel{ class = <<"timestamp">>, body = guard:html_escape(wf:f("~2w:~2..0w:~2..0w", [Hour, Minute,Second])) },
-                % #panel{ class = <<"right-side">>, body = [
                     case {CanDelete, IsHead} of
                         {true, true} -> #link{ class = <<"link danger compact">>, body = <<"Delete thread">>, postback = {hide_thread, Tid} };
                         {true, _} -> #link{ class = <<"link danger compact">>, body = <<"✕"/utf8>>, postback = {hide_post, Id} };
@@ -413,18 +401,6 @@ html_thread(#board{uri=Uri},#thread{id=Id,name=Topic,type=ThreadType}=_Thread,#p
             #panel{class= <<"post-attachment">>,body=html:post_attachment(Post)}
         ]}.
 
-% html_blog([]) -> [];
-% html_blog(HeadBlogList2) ->
-%     {#thread{id=Id, name=Topic}, #post{}} = lists:last(HeadBlogList2),
-%     #panel { class = <<"board-thread">>, body = [
-%             %         #link{
-%             % body = case guard:html_escape(Topic) of <<>> -> wf:f("#~w", [Id]); T -> T end,
-%             % href = wf:f("/thread?id=~p", [Id]) },
-%         #link{
-%             body = guard:html_escape(<<"Вся лента блога ("/utf8, (wf:to_binary(length(HeadBlogList2)))/binary,") >>>>"/utf8>>),
-%             href = wf:f("/board?id=~p&blog", [get(?BOARD_ID)]) }
-%     ]}.
-%
 settings_panel(board, #board{}=B) ->
     #panel { body = [
         #panel { class = <<"flex-container">>, body = [
@@ -505,12 +481,9 @@ name_selector(User) ->
 name_selector_extract(Number) -> maps:get(Number,erlang:get(namelist_map),anonymous).
 
 categories_list(#board{category=Categories}) ->
-    % lists:map(fun({Cid,_Ctext}) -> wf:to_atom(<<"category-",(wf:to_binary(Cid))/binary>>) end,Categories).
     [Cid || {Cid,_Ctext} <- Categories].
 categories_extract(#board{category=Categories}) ->
     lists:foldl(fun({Cid,Ctext},Acc) ->
-        % QC= wf:to_atom(<<"category-",(wf:to_binary(Cid))/binary>>),
-        % wf:info(?MODULE,"Cat: ~p",[wf:q(QC)]),
         case wf:q(Cid) of "on" -> [Cid|Acc]; _ -> Acc end
         end,[],Categories).
 

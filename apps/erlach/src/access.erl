@@ -1,4 +1,5 @@
 -module(access).
+-author('andy').
 -export([ meta/1,
           discavering/2,
           lookup/2,

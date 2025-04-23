@@ -1,13 +1,7 @@
 -define(ERLACH_VERSION, <<"2.2 beta">>).
 
-% -define(BOARD_ID, board_id).
-% -define(THREAD_ID, thread_id).
-% -define(USER_ID, anonymous).
 -define(SITE_ROOT_LOCATION, "apps/erlach/priv").
 -define(ATTACHMENT_LOCATION, "static/attachments").
-% -define(STORED_POST_ID, stored_post_id).
-% -define(STORED_REQUEST_TO, stored_request_to).
-% -define(MARKDOWN_ENABLED, markdown_enabled).
 -define(NEWEST_POSTS, newest_posts).
 
 -record(cookie, {status :: new | actual | atom(), path, ttl, issued, expire}).
@@ -27,7 +21,6 @@
 
 -define(UPLOAD_MIN_SIZE, 100).
 -define(UPLOAD_MAX_SIZE, 10485760). % 10MB
-% -define(UPLOAD_MAX_SIZE, 102400). % 100KB
 
 -define(SITE_NAME, <<"Erlach">>).
 -define(TITLE_DELIMETER, <<" – "/utf8>>).
@@ -38,10 +31,10 @@
 -define(IDS_BASE, 36).
 
 -record(route, {
-    module :: atom(),
-    board,
-    type :: blog|thread,
-    thread,
-    category,
-    option :: any()
-    }).
+  module :: atom(),
+  board,
+  type :: blog|thread,
+  thread,
+  category,
+  option :: any()
+  }).

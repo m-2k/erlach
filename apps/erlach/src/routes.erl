@@ -1,5 +1,5 @@
 -module(routes).
--author('Maxim Sokhatsky').
+-author('andy').
 -include_lib("n2o/include/wf.hrl").
 -export([init/2, finish/2]).
 

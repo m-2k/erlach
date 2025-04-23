@@ -1,4 +1,5 @@
 -module(bpg). %% BOARD LISTENING
+-author('andy').
 -vsn('0.0.0').
 
 -compile(export_all).

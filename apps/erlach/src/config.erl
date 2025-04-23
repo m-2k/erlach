@@ -1,4 +1,5 @@
 -module(config).
+-author('andy').
 -compile(export_all).
 
 log_modules() ->
@@ -39,10 +40,7 @@ log_modules() ->
     ].
 
 log_level() -> warning.
-
-% debug() -> false.
 debug() -> false.
-
 info() ->  spawn(fun()-> wf:info(index,"~p",[mnesia:info()]) end).
 
 expire_time_to_edit_messages() -> 30*60. % 30 min

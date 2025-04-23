@@ -1,4 +1,6 @@
 -module(web_app).
+-author('andy').
+
 -behaviour(application).
 -export([start/0, start/2, stop/1, main/1]).
 

@@ -1,4 +1,5 @@
 -module(utils).
+-author('andy').
 -compile(export_all).
 
 -include_lib("n2o/include/wf.hrl").
@@ -190,19 +191,6 @@ init_db() ->
     
     qs:init().
 
-% set_access() ->
-%     utils:set_ba(1,[{anonymous,read,blog},{anonymous,read,post},
-%         {registered,read,blog},{registered,read,post},{registered,read,message},
-%         {private,read,blog}]),
-%     utils:set_ba(2,[{anonymous,read,blog},{anonymous,write,post},{anonymous,write,message},
-%         {registered,read,blog},{registered,write,post},{registered,write,message},
-%         {private,read,blog},{private,write,message},{private,write,request}]),
-%     utils:set_ba(6,[{private,read,blog},{private,write,message},{private,write,request}]).
-%
-% clear_access() ->
-%     utils:set_ba(1,[]),
-%     utils:set_ba(2,[]),
-%     utils:set_ba(6,[]).
 
 add_name(Uid,Name) ->
     kvs:add(#name{

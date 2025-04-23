@@ -1,8 +1,5 @@
 -module(db_thread).
-% -include_lib("kvs/include/kvs.hrl").
 -include_lib("kvs/include/metainfo.hrl").
-% -include_lib("kvs/include/feed.hrl").
-% -include_lib("db/include/db.hrl").
 -include_lib("db/include/thread.hrl").
 -compile(export_all).
 
@@ -10,6 +7,6 @@
 %% {ok, P} = kvs:get(post, 1), kvs:put(P#post{message="AAA"}).
 
 metainfo() ->
-    #schema{name=kvs,tables=[
-        #table{name=thread,container=feed,fields=record_info(fields,thread),keys=[]}
-        ]}.
+  #schema{name=kvs,tables=[
+    #table{name=thread,container=feed,fields=record_info(fields,thread),keys=[]}
+    ]}.

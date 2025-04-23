@@ -38,17 +38,12 @@ function drag_input_init() {
 drag_input_init();
 
 function fileLoadFinished(pos) {
-	// var thumb = document.querySelectorAll("#thumbnail-list canvas")[pos];
-	// thumb.style.opacity = 1.0;
-	// thumb.is_loaded = true;
 	thumbnails[pos].style.opacity = 1.0;
 	thumbnails[pos].is_loaded = true;
 };
 function fileLoadFailed(pos) {
     console.log("Upload error" + pos);
     thumbnails[pos].style.opacity = 0.2;
-    // thumbnails[pos].style.webkitFilter = "blur(1px)";
-    // thumbnails[pos].parentElement.style.borderColor = "rgba(255,0,0,0.7)";
 };
 
 function roundedCanvas(ctx,x,y,width,height,radius){
@@ -71,23 +66,17 @@ function handleFileSelect(evt) {
   var output = [];
   
   for (var i = 0, file; file = files[i]; i++) {
-        // debugger;
-        // Only process image files.
-        // if (!file.type.match('image.*')) { continue; }
 		if (!file.type.match('^(image/jpeg)|(image/png)|(image/gif)$')) { console.log("Ignoring file type: " + file.type); continue; }
 		else { console.log("Accepted file type: " + file.type); };
-        // debugger;
         
         /// Canvas HD
         var h = 35;
         var newimg = document.createElement("img");
         newimg.addEventListener('load', (function () {
             var newimg_container = document.createElement("div");
-            // thumbnails[thumb_iterator] = newimg_container;
             var canvas = document.createElement("canvas");
             var ctx = canvas.getContext('2d');
             newimg_container.setAttribute("class", "thumb-container");
-            // newimg_container.style.backgroundImage = "url(" + this.image.src + ")";
             var w = h * (this.image.width / this.image.height);
             newimg_container.style.width = Math.floor(w);
             
@@ -101,7 +90,6 @@ function handleFileSelect(evt) {
             var backingStoreRatio = ctx.backingStorePixelRatio || 1;
 
             var ratio = (devicePixelRatio / backingStoreRatio) * 2;
-            // debugger
             /// upscale the canvas if the two ratios don't match
             // if (devicePixelRatio !== backingStoreRatio) {
                 canvas.width = cw * ratio;
@@ -113,12 +101,8 @@ function handleFileSelect(evt) {
             // }
             
             ctx.save();
-            // ctx.translate(0,0);
-            // ctx.scale(2,2);
-            // ctx.clearRect(0,0,cw,ch);
             roundedCanvas(ctx,0,0,cw,ch,2);
             ctx.clip();
-            // ctx.scale(2,2);
             ctx.drawImage(this.image, 0, crop, this.image.width, this.image.height-crop-crop , 0, 0, cw, ch);
             ctx.restore();
             
@@ -178,7 +162,6 @@ function textarea_height_calc(e) {
     e.style.height = e.scrollHeight;
 }
 function textarea_init(t) {
-    // t.rows=1; // hardcoded for best performans
     textarea_height_calc(t);
     t.addEventListener('input', function () { textarea_height_calc(this) } );
     if(t.classList.contains('autostore')) { textarea_init_autostore(t); };
@@ -192,10 +175,7 @@ Array.prototype.forEach.call(ta_elements, function(t, i){ textarea_init(t) });
 
 var STORE_TIMEOUT = 4000;
 var storeTimer;
-// var textarea = document.getElementById('message');
 function textarea_init_autostore(t) {
-    // var textarea_topic = document.getElementById('topic');
-    // var send_message = document.getElementById('send_message');
     var onchange = function() {
     
         /// Enabling button
@@ -206,13 +186,6 @@ function textarea_init_autostore(t) {
         if(t.value !== "") {
             storeTimer = window.setTimeout(function(){
                 console.log("Auto storing");
-                // if (textarea_topic) {
-                //     ws.send(enc(tuple(atom('client'),tuple(atom('store_thread'), textarea_topic.value, textarea.value))));
-                // } else {
-                //     ws.send(enc(tuple(atom('client'),tuple(atom('store_post'), textarea.value))));
-                // }
-                // var store_button=qi('store');
-                // if(store_button){ store_button.click(); };
                 ws.send(enc(tuple(atom('client'),atom('auto_store'))));
             },STORE_TIMEOUT);
         }
@@ -224,7 +197,6 @@ function textarea_init_autostore(t) {
 };
 
 function publish_finished() {
-	// debugger;
     window.clearTimeout(storeTimer);
     qi('message').value="";
     
@@ -249,7 +221,6 @@ function image_click_event(){
     im_f.style.webkitAnimationName = im_f.style.animationName = "flash";
     im_b.style.opacity = "0";
     im_b.src = undefined;
-    //ivo.style.display = "block";
     ivo.style.webkitAnimationName = ivo.style.animationName = "slide-right";
     start_keyframes_timer();
 }
@@ -280,11 +251,7 @@ if(ivo) {
     im_b.addEventListener('click', function (evt) { e = evt || window.event; if(e.target == this) { next_image(); } });
 
     function close_image_viewer() {
-        //window.clearTimeout(keyframesTimer);
         keyframesTimer = undefined;
-        //ivo.style.display = "none";
-        //im_f.style.webkitAnimationName = im_f.style.animationName = "";
-        //im_b.style.webkitAnimationName = im_b.style.animationName = "";
         ivo.style.webkitAnimationName = ivo.style.animationName = "slide-left";
         reverse = false;
         start_keyframes_timer();
@@ -305,7 +272,6 @@ if(ivo) {
                 reverse = !reverse;
 
                 im2.idx = direction ? next_index(im1.idx) : prev_index(im1.idx);
-                //console.log("idx:" + im2.idx + " of " + im_elements.length);
                 im2.src = im_elements[im2.idx].src;
 
                 if(im1.src) { im1.style.webkitAnimationName = im1.style.animationName = direction ? "slide-left" : "hide"; }
