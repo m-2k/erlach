@@ -1,5 +1,5 @@
 -module(element_hookup).
--author('andy').
+-author('Andy').
 -compile(export_all).
 -include("erlach.hrl").
 
@@ -9,7 +9,7 @@ render_element(Record) ->
     Id = case Record#hookup.postback of
         undefined -> Record#hookup.id;
         Postback ->
-            ID = case Record#hookup.id of undefined -> wf:temp_id(); I -> I end,
+            ID = case Record#hookup.id of undefined -> spa:temp_id(); I -> I end,
             wf:wire(#event{ type=click,postback=Postback,target=ID,module=element_hookup,
                             source=Record#hookup.source,delegate=Record#hookup.delegate}),
             ID end,

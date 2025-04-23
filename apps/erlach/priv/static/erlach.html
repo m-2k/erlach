@@ -6,9 +6,15 @@
     </head>
     <body>
         <header id='header'></header>
-        <div id='content'></div>
+        <div id='main'>
+            <div id='sidebar'></div>
+            <div id='content'></div>
+        </div>
         <footer id='footer'></footer>
         <div class='drag'></div>
+        <div id='viewer'><div class='fl cent monitor'><div class='media'></div></div></div>
+        <div id='popup-messages'></div>
+        
         <script>var transition = {pid: '', host: 'localhost', port:'8000'};</script>
         
         <script src='/n2o/protocols/bert.js'></script>
@@ -21,13 +27,6 @@
         <script src='/n2o/n2o.js'></script>
         <script src='/n2o/ftp.js'></script>
         <script src='/n2o/validation.js'></script>
-    
-        <script src='/static/jshash-2.2/md5.js'></script>
-        <script src='/static/jshash-2.2/ripemd160.js'></script>
-        <script src='/static/jshash-2.2/sha1.js'></script>
-        <script src='/static/jshash-2.2/sha1-stream.js'></script>
-        <script src='/static/jshash-2.2/sha256.js'></script>
-        <script src='/static/jshash-2.2/sha512.js'></script>
         <script src='/static/erlach.js'></script>
         <script>protos=[$client,$bert];N2O_start();</script>
     </body>

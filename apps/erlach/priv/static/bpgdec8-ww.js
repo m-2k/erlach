@@ -1,4 +1,4 @@
-
+// VERSION  0.9.5 vanilla
 var WND = {};
 print = undefined;
 

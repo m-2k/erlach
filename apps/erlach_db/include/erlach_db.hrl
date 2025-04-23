@@ -1,5 +1,5 @@
 -ifndef(DB_HRL).
--define(DB_HRL, "db.hrl").
+-define(DB_HRL, "erlach_db.hrl").
 
 -include_lib("kvs/include/kvs.hrl").
 -include_lib("kvs/include/feed.hrl").
@@ -19,12 +19,14 @@
     ).
 
 -record(db_element,  {?DB_ELEMENT(undefined)}).
--record(group, {?DB_ELEMENT(feed)}).
--record(board, {?DB_ELEMENT(feed)}).
--record(thread, {?DB_ELEMENT(feed), name_escaped = <<>>, message = <<>>, message_escaped = <<>>, image }).
--record(post, {?DB_ELEMENT(feed), message = <<>>, message_escaped = <<>>, image }).
+-record(party, {?DB_ELEMENT(feed)}).
+-record(board, {?DB_ELEMENT(feed),
+    limit % bump_limit
+    }).
+-record(post, {?DB_ELEMENT(feed), first, name_escaped = <<>>, message = <<>>, message_escaped = <<>>, links = [], sage = false, image }).
 -record(attachment, {?DB_ELEMENT(feed),
 	path,
+    target,
     original_path,
 	original_mime,
 	size,

@@ -1,41 +1,31 @@
 -module(erlach_spa).
 -compile(export_all).
-% -compile({parse_transform, shen}).
--author('andy').
--include_lib("n2o/include/wf.hrl").
+-author('Andy').
+
 -include("erlach.hrl").
 
 main() -> wf:info(?M,"main",[]).
 
 redirect(#postback{}=P) -> self() ! {server,P}.
 
-% 2-step rendering for best performance DOM update
-% render_scope([],#st{}=_S) -> [];
-% render_scope(Elements,#st{route=#route{module=Module}}=S) ->
-%     Module:event({server,#deferred_insert{is_return_elements=true,elements=Elements,state=S}}).
-
-
 event(init) ->
-    wf:info(?M,"init",[]),
-    % wf:reg(n2o_session:session_id()),
+    wf:info(?M,"init ~p",[self()]),
+    wf:update(header,?SPA:render(header,#st{})),
+    wf:update(footer,?SPA:render(footer,#st{})),
+    wf:update('popup-messages',#panel{id='popup-messages',class= <<"line-up">>}),
     Route=?CTX#cx.path,
     navigate(Route),
-    S=erlang:get(state),
-    wf:update(header,?SPA:render(header,S)),
-    wf:update(footer,?SPA:render(footer,S)),
     erlach_qs:history_init(),
+    erlach_subscription:pickup_data(),
     wf:info(?M,"init ~p",[ok]);
-% event(login) -> erlach_utils:redirect(erlach_qs:mp(login));
-% event(logout) -> wf:logout(), erlach_utils:redirect(erlach_qs:mp(main));
-event({client,{history,Secret}}) -> navigate(Query=n2o_secret:depickle(Secret));
+event({client,{history,Secret}}) -> navigate((n2o_secret:depickle(Secret))#query{history=true});
 event(terminate) ->
-    wf:unreg(n2o_session:session_id()),
     terminate_render(),
     erlach_image:clear_temporary(erlach_utils:rst());
 event(E) -> ?EVENT_ROUTER:proxy(E).
 
 init_render(Route) ->
-    erlach_utils:id_erase(),
+    spa:id_erase(),
     erlach_utils:rst_erase(),
     PageId=wf:to_binary(erlang:unique_integer()), % for FTP
     wf:reg(PageId),    
@@ -43,62 +33,78 @@ init_render(Route) ->
     Route#route{page_id=PageId}.
     
 terminate_render() ->
-    case erlang:get(state) of
-        #st{route=#route{render=R,page_id=PageId}} ->
+    case spa:st() of
+        #st{route=#route{render=R,page_id=PageId}}=S ->
+            erlach_stat:time_stop(S),
             wf:unreg(PageId), 
             R:terminate();
         _ -> skip
     end.
-navigate(#query{}=Q) -> navigate(routes:route(Q));
-navigate(#postback{action=view,history=H,query=#query{}=Q,route_option=O}) ->
-    case O of ?UNDEF -> navigate(Q); _ -> navigate((routes:route(Q))#route{option=O}) end,
-    case H of true -> erlach_qs:history_push(); _ -> skip end;
-navigate(#route{render=Render}=Route) ->
-    wf:info(?M,"New Route: ~p",[Route]),
+navigate(#query{}=Q) -> navigate(erlach_routes:route(Q));
+navigate(#postback{action=view,history=H,query=#query{q3=Urn}=Q,route_option=O}=P) ->
+    wf:info(?M,"Navigate ~p",[P]),
+    case erlach_qs:is_in_thread_postback(P) of
+        true when is_binary(Urn) andalso size(Urn) > 0 ->
+            erlach_thread:scroll_to(erlach_qs:urn_to_id(Urn));
+        _ ->
+            navigate((erlach_routes:route(Q))#route{option=O}),
+            case H of true -> erlach_qs:history_push(); _ -> skip end
+    end;
+navigate(#route{render=Render}=R) ->
+    wf:info(?M,"New Route: ~p",[R]),
 
     terminate_render(),
-    Route2=init_render(Route),
+    R2=init_render(R),
     
-    case Render:init(Route2) of
+    case Render:init(R2) of
         {redirect,Postback} ->
             wf:info(?M, "navigate redirect to: ~p",[Postback]),
             redirect(Postback);
-        {ok,#st{route=Route3}=NewState} ->
-            wf:update(content,Render:render(content,NewState)),
-            wf:info(?M, "navigate to: ~p",[Route3]),
-            erlang:put(state,NewState),
+        {ok,#st{route=R3}=S} ->
+            erlach_stat:time_start(S),
+            S2=S#st{access=erlach_auth:access()},
+            wf:update(content,Render:render(content,S2)),
+            wf:update(breadcrumbs,?SPA:render(breadcrumbs,S2)),
+            wf:update(footer,?SPA:render(footer,S2)),
+            Render:finalize(S2),
+            wf:info(?M, "navigate to: ~p",[R3]),
+            spa:st(S2),
             []
         % Error ->
         %     wf:error(?M, "navigate error: ~p",[Error]),
         %     erlach_utils:redirect(erlach_qs:mp(main))
     end.
 
-render(header=Panel,#st{}) ->
-    #header{id=Panel,class= <<"fl cent line">>,body=#panel{class= <<"fl page">>,body=[
-        #hookup{body="Donate"},
-        #hookup{class= <<"erlach-logo">>,body=wf:jse(logo()),href=erlach_qs:ml(main),postback=erlach_qs:mp(main)},
-        #hookup{body="Search"}
+render(breadcrumbs=Panel,#st{board=#board{urn=Urn,name=Name}=B,thread=#post{type=thread}}) ->
+    #panel{id=Panel,body=#hookup{body=[$/,Urn,<<"/ – "/utf8>>,Name],href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}};
+render(breadcrumbs=Panel,#st{}) -> #panel{id=Panel};
+render('erlach-logo'=Panel,#st{}) -> #hookup{id=Panel,body=wf:jse(logo()),href=erlach_qs:ml(main),postback=erlach_qs:mp(main)};
+render(manage=Panel,#st{}=S) ->
+    Btn=spa:temp_id(),
+    #panel{id=Panel,body=[
+        #hookup{id=Btn,class=selector,body= <<"Notify">>,postback=#view{mod=erlach_main,target=sidebar,option=true,element=Btn}}
+    ]};
+    
+render(header=Panel,#st{}=S) ->
+    #header{id=Panel,class= <<"fl cent line-down">>,body=#panel{class= <<"fl page">>,body=[
+        render(breadcrumbs,S),
+        render('erlach-logo',S),
+        render(manage,S)
         ]}};
-render(footer=Panel,#st{}) ->
-    ExtClass= <<"b">>,
-    IntClass= <<"b">>,
+render(footer=Panel,#st{access=A}) ->
+    ExtClass= <<"b checked">>,
+    IntClass= <<"b checked">>,
     #panel{id=Panel,body=[
         #panel{class= <<"related-links">>,body=[
-            #link{class=ExtClass, target="_blank", body= <<"Erlang Powered➲"/utf8>>, href= <<"http://erlang.org">>},
-            #link{class=ExtClass, target="_blank", body= <<"EoX➲"/utf8>>, href= <<"http://erlangonxen.org">>},
-            #link{class=ExtClass, target="_blank", body= <<"Tails➲"/utf8>>, href= <<"https://tails.boum.org">>},
-            #link{class=ExtClass, target="_blank", body= <<"Tor➲"/utf8>>, href= <<"https://www.torproject.org">>},
-            #link{class=ExtClass, target="_blank", body= <<"Digital Ocean➲"/utf8>>, href= <<"https://digitalocean.com">>},
-            #link{class=ExtClass, target="_blank", body= <<"Cowboy➲"/utf8>>, href= <<"https://github.com/ninenines/cowboy">>},
-            #link{class=ExtClass, target="_blank", body= <<"NoSQL➲"/utf8>>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
-            #link{class=ExtClass, target="_blank", body= <<"BPG Ready➲"/utf8>>, href= <<"http://bellard.org/bpg/">>},
-            #link{class=ExtClass, target="_blank", body= <<"Markdown➲"/utf8>>, href= <<"https://help.github.com/articles/markdown-basics/">>},
-            #link{class=IntClass, body= <<"Privacy"/utf8>>, href= <<"/privacy">>},
-            #link{class=IntClass, body= <<"Terms"/utf8>>, href= <<"/terms">>},
-            #link{class=IntClass, body= <<"About Erlach"/utf8>>, href= <<"/about">>}
-        ]}
+            #link{class=ExtClass, target="_blank", body= <<"LING"/utf8>>, href= <<"http://erlangonxen.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"Tails"/utf8>>, href= <<"https://tails.boum.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"Tor"/utf8>>, href= <<"https://www.torproject.org">>},
+            #link{class=ExtClass, target="_blank", body= <<"NoSQL"/utf8>>, href= <<"http://www.erlang.org/doc/apps/mnesia/">>},
+            #link{class=ExtClass, target="_blank", body= <<"BPG"/utf8>>, href= <<"http://bellard.org/bpg/">>},
+            #hookup{class=IntClass, body= <<"About Erlach"/utf8>>, href=erlach_qs:ml(about), postback=erlach_qs:mp(about)},
+            case A of ?UNDEF -> []; _ -> #hookup{class=IntClass, body= <<"Logout"/utf8>>, postback=#auth{logout=true}} end
+            ]}
     ]}.
-
 
 logo() -> % Different as original
     <<"<svg width='100px' height='20px' viewBox='-2 0 284 50' version='1.1'

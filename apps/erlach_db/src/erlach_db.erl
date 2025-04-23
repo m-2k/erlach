@@ -1,5 +1,5 @@
 -module(erlach_db).
--author('andy').
+-author('Andy').
 -behaviour(application).
 -behaviour(supervisor).
 
@@ -14,17 +14,16 @@ init([]) -> {ok, {{one_for_one,5,10}, []} }.
 
 metainfo() ->
     #schema{name=kvs,tables=[
-        #table{name=group,container=feed,fields=record_info(fields,group),keys=[]},
+        #table{name=party,container=feed,fields=record_info(fields,party),keys=[]},
         #table{name=board,container=feed,fields=record_info(fields,board),keys=[urn]},
-        #table{name=thread,container=feed,fields=record_info(fields,thread),keys=[urn]},
         #table{name=post,container=feed,fields=record_info(fields,post),keys=[]},
         #table{name=attachment,container=feed,fields=record_info(fields,attachment),keys=[]}
         ]}.
 
 init() ->
     Group=fun(Name,Desc,Boards) ->
-        Gid=kvs:next_id(group,1),
-        kvs:add(#group{id=Gid,created=erlang:system_time(),
+        Gid=kvs:next_id(party,1),
+        kvs:add(#party{id=Gid,created=erlang:system_time(),
             name=Name,desc=Desc}),
         lists:foreach(fun({BoardUrn,BoardName,BoardDesc}) ->
             kvs:add(#board{id=kvs:next_id(board,1),created=erlang:system_time(),
@@ -78,7 +77,7 @@ init() ->
         {<<"sx"/utf8>>, <<"Секс"/utf8>>, <<""/utf8>>},
         {<<"au"/utf8>>, <<"Автомобили"/utf8>>, <<""/utf8>>},
         {<<"sp"/utf8>>, <<"Спорт"/utf8>>, <<""/utf8>>},
-        {<<"ft"/utf8>>, <<"Футбол"/utf8>>, <<""/utf8>>},
+        % {<<"ft"/utf8>>, <<"Футбол"/utf8>>, <<""/utf8>>},
         {<<"mt"/utf8>>, <<"Мотоциклы"/utf8>>, <<""/utf8>>},
         {<<"dom"/utf8>>, <<"Домострой"/utf8>>, <<""/utf8>>},
         {<<"av"/utf8>>, <<"Авиация"/utf8>>, <<""/utf8>>},
@@ -114,13 +113,24 @@ init() ->
     ]),
     ok.
 
+% threads in board 1
 populate() ->
     Bid = 1,
     Thread=fun() ->
-        Tid=kvs:next_id(thread,1),
-        kvs:add(#thread{id=Tid,created=erlang:system_time(),feed_id={thread,Bid},
-            urn=erlach_utils:id_to_urn(Tid),
-            name=wf:to_binary(wf:temp_id()),message=wf:to_binary(wf:temp_id())})
+        Pid=kvs:next_id(post,1),
+        kvs:add(#post{type=thread,id=Pid,created=erlang:system_time(),feed_id={thread,Bid},urn=erlach_utils:id_to_urn(Pid),
+            name_escaped=wf:to_binary(wf:temp_id()),message_escaped=wf:to_binary(wf:temp_id())})
         end,
     [ Thread() || _ <- lists:seq(1,10) ],
     ok.
+
+% x-counted posts in custom-thread
+populate(Tid,Count) when is_binary(Tid) -> populate(erlach_qs:urn_to_id(Tid),Count);
+populate(Tid,Count) when is_integer(Tid)->
+    {ok,T}=kvs:get(post,Tid),
+    Post=fun() ->
+        Pid=kvs:next_id(post,1),
+        kvs:add(#post{id=Pid,created=erlang:system_time(),feed_id={post,Tid},type=post,
+            urn=erlach_qs:id_to_urn(Pid),message_escaped=wf:to_binary(wf:temp_id())})
+    end,
+    utils:times(Post,Count).

@@ -1,5 +1,5 @@
 -module(erlach_migration).
--author('andy').
+-author('Andy').
 
 -include_lib("erlach_db/include/erlach_db.hrl").
 
@@ -7,7 +7,6 @@ backup_table_list() -> [
         feed,
         id_seq,        
         board,
-        thread,
         post,
         attachment
     ].
@@ -16,7 +15,6 @@ backup_file(Table) when is_atom(Table) -> "/tmp/backup-" ++ atom_to_list(Table) 
 backup_ri(feed) ->          { record_info(fields, feed),        #feed{} };
 backup_ri(id_seq) ->        { record_info(fields, id_seq),      #id_seq{} };
 backup_ri(board) ->         { record_info(fields, board),       #board{} };
-backup_ri(thread) ->        { record_info(fields, thread),      #thread{} };
 backup_ri(post) ->          { record_info(fields, post),        #post{} };
 backup_ri(attachment) ->    { record_info(fields, attachment),  #attachment{} }.
 

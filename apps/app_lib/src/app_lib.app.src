@@ -1,0 +1,9 @@
+{application, app_lib,
+  [
+    {description, "Application Library"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib]},
+    {mod, { app_lib, []}},
+    {env, []}
+  ]}.

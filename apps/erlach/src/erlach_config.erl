@@ -1,14 +1,8 @@
--module(config).
--author('andy').
+-module(erlach_config).
 -compile(export_all).
 
-log_modules() ->
-    [
-        % n2o_stream,
-        % n2o_proto,
-        % n2o_document,
-        % cowboy_websocket,
-
+log_level() -> info.
+log_modules() -> wf:config(erlach,log_modules,[
         erlach,
         erlach_qs,
         erlach_spa,
@@ -16,21 +10,18 @@ log_modules() ->
         erlach_board,
         erlach_thread,
         erlach_event_router,
+        erlach_utils,
         erlach_image,
-        
-        % wf_convert,
-        % n2o_file,
-        n2o_async,
-        
-        ghjvkfhvghk
-    ].
+        erlach_about,
+        erlach_auth,
+        erlach_subscription,
+        erlach_stat,
+        erlach_filter,
+        erlach_feeds
+        ]).
 
-log_level() -> info.
 debug() -> false.
 info() ->  spawn(fun()-> wf:info(hd(log_modules()),"~p",[mnesia:info()]) end).
-
-post_max_length() -> 2000.
-topic_max_length() -> 100.
 
 expire_time_to_edit_messages() -> 30*60. % 30 min
 
@@ -38,8 +29,6 @@ render_preload_count(_) -> 10.
 render_part_count(_) -> 10.
 
 cowboy_nb_acceptors() -> 100.
-
-event_renders() -> [main,board,thread].
 
 password_length() -> 16.
 password_chars_allowed() ->
@@ -52,6 +41,6 @@ join_auth_key_length() -> 24.
 
 notification_read_timeout() -> 10000.
 
-filename(_Ftp) -> integer_to_list(erlang:unique_integer()).
+filename(_Ftp) -> wf:hex_encode(<<(erlang:unique_integer()):64>>).
 
 image_convert_timeout() -> 600000.
