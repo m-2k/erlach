@@ -5,192 +5,232 @@
 % apt-get install libjpeg-progs
 
 -include("erlach.hrl").
+-include("erlach_image.hrl").
 
--record(convert_entry,{original,converted,port,from,target,group,image_info,stage}).
--define(SUP_CLASS,service).
--define(SUP_NAME,converter).
+ext(#jpeg{}) -> <<".jpg">>;
+ext(#png{}) ->  <<".png">>;
+ext(#gif{}) ->  <<".gif">>;
+ext(#bpg{}) ->  <<".bpg">>.
 
-path(P) -> <<(wf:to_binary(P))/binary,".image">>.
+mime(#jpeg{}) -> <<"image/jpeg">>;
+mime(#png{}) ->  <<"image/png">>;
+mime(#gif{}) ->  <<"image/gif">>;
+mime(#bpg{}) ->  <<"image/bpg">>.
 
-mime(#jpeg{}) -> 'image/jpeg';
-mime(#png{}) -> 'image/png';
-mime(#gif{}) -> 'image/gif';
-mime(#bpg{}) -> 'image/bpg'.
+type(#jpeg{}) -> jpeg;
+type(#png{}) ->  png;
+type(#gif{}) ->  gif;
+type(#bpg{}) ->  bpg;
+type(_) -> ?UNDEF.
 
-dim(#jpeg{width=W,height=H}) -> {ok,W,H};
-dim(#png{width=W,height=H}) -> {ok,W,H};
-dim(#gif{width=W,height=H}) -> {ok,W,H};
-dim(#bpg{width=W,height=H}) -> {ok,W,H}.
+w(Info) -> element(#image_info.width,Info).
+h(Info) -> element(#image_info.height,Info).
 
 
-reply(Target,From,Group,Message) ->
-    case Target of ?UNDEF -> From ! {server,Message}; _ -> wf:send(Group,{server,Message}) end.
+filename(#ftp{filename=F}) -> spa_utils:hash({file,F,erlang:system_time(nano_seconds)}). % n2o upload
 
-start() ->
+destination(Source,Storage,Path,Info) ->
+    filename:join([Storage,Path,[filename:basename(Source),ext(Info)]]).
+
+start(Group) -> restart(Group).
+restart(Group) ->
     wf:info(?M,"Convert supervisor starting...",[]),
-    n2o_async:stop(?SUP_CLASS,?SUP_NAME),
-    n2o_async:start(#handler{module=?MODULE,group=?APP,class=?SUP_CLASS,name=?SUP_NAME,state=[]}).
-convert(Path,Group,Target) ->
-    case n2o_async:pid({?SUP_CLASS,?SUP_NAME}) of Pid when is_pid(Pid) -> ok; _ -> start() end,
-    n2o_async:send(?SUP_CLASS,?SUP_NAME,{convert,Path,Group,Target,self()}).
-target(Path,Target) ->
-    n2o_async:send(?SUP_CLASS,?SUP_NAME,{target,Path,Target}).
-    
-is_alpha(#gif{alpha=0}) -> false;
-is_alpha(#gif{}) -> true;
-is_alpha(#png{color_type='grayscale-alpha'}) -> true;
-is_alpha(#png{color_type='truecolor-alpha'}) -> true;
-is_alpha(#png{}) -> false;
-is_alpha(#jpeg{}) -> false;
-is_alpha(#bpg{alpha=true}) -> true;
-is_alpha(#bpg{}) -> false.
+    case n2o_async:stop(?SUP_CLASS,Group) of
+        #handler{}=H -> n2o_async:start(H);
+        _ -> n2o_async:start(#handler{module=?M,group=?APP,class=?SUP_CLASS,name=Group,state=#state{}})
+    end.
+convert(Key,Group,Source,Storage,Path,Meta,Target,FinallyFun,ErrorFun) ->
+    wf:info(?M,"(~p) Call convert ~p ~p",[self(),Key,Source]),
+    case n2o_async:pid({?SUP_CLASS,Group}) of Pid when is_pid(Pid) -> ok; _ -> restart(Group) end,
+    E=#entry{id=Key,group=Group,
+        source=Source,storage=Storage,path=Path,meta=Meta,target=Target,
+        finally=FinallyFun,error=ErrorFun,from=self()},
+    n2o_async:send(?SUP_CLASS,Group,{insert_entry,E}).
+update(Key,Group,Fun) -> n2o_async:send(?SUP_CLASS,Group,{upadate_entry,Key,Fun}).
+abort(Key,Group) -> n2o_async:send(?SUP_CLASS,Group,{abort_entry,Key}).
+dump(Group) -> n2o_async:send(?SUP_CLASS,Group,dump).
+stop(Group) -> n2o_async:stop(?SUP_CLASS,Group).
 
-proc(init,H) -> wf:info(?M,"Convert supervisor started: ~p",[self()]), {ok,H};
-proc({convert,Path,Group,Target,From}=M,#handler{state=S}=H) when is_pid(From) ->
-    Original=wf:to_binary(Path),
-    case image_info_file(Original) of
-        {ok,#jpeg{width=Width,height=Height},_} when Width > 8688 orelse Height > 6192 ->
-            reply(Target,From,Group,#pubsub{target=image,action=convert,element=Target,data={error,{high_resolution,Width,Height}},from=From}),
-            {reply,ok,H};
-        {ok,#jpeg{width=Width,height=Height}=ImageInfo,_} ->
-            Mem= <<"524288">>, % Maximum memory to use (in kbytes)
-            Converted=path(Original),
-            Cmd= <<"jpegtran -copy none -optimize -maxmemory ",Mem/binary," -outfile ",Converted/binary," ",Original/binary>>,
-            Port = erlang:open_port({spawn, Cmd},[exit_status]),
-            wf:info(?M,"Jpegtran (~p): ~p",[Port,Cmd]),
-            Entry=#convert_entry{original=Original,converted=Converted,port=Port,from=From,target=Target,group=Group,image_info=ImageInfo,stage=convert},
-            {reply,ok,H#handler{state=[ Entry | S ]}};
-        {ok,#gif{width=Width,height=Height},_} when Width > 8688 orelse Height > 6192 ->
-            reply(Target,From,Group,#pubsub{target=image,action=convert,element=Target,data={error,{high_resolution,Width,Height}},from=From}),
-            {reply,ok,H};
-        {ok,#gif{width=Width,height=Height}=ImageInfo,_} ->
-            Converted=path(Original),
-            Cmd= <<"mv ",Original/binary," ",Converted/binary>>,
-            Port = erlang:open_port({spawn, Cmd},[exit_status]),
-            wf:info(?M,"Gif fake (~p): ~p",[Port,Cmd]),
-            Entry=#convert_entry{original=Original,converted=Converted,port=Port,from=From,target=Target,group=Group,image_info=ImageInfo,stage=convert},
-            {reply,ok,H#handler{state=[ Entry | S ]}};
-        {ok,ImageInfo,_} ->
-            PngFormat= case is_alpha(ImageInfo) of true -> <<" PNG32:">>; false -> <<" PNG24:">> end,
-            Resize= wf:config(erlach,imagemagick_resize,<<" -resize 8688x8688\\>">>),
-            % 8688 × 5792 Canon 3DS
-            % 8256 x 6192 Pentax 645Z
-            % 7360 × 4912 Nikon D810
-            {CmdOptions,CmdFileExt}=case ImageInfo of
-                #gif{animation=true,delays=Delays} ->
-                    case Delays of
-                        [_|_] -> file:write_file(<<Original/binary,".delays">>,<< <<(integer_to_binary(D))/binary,$\n>> || D <- Delays >>);
-                        _ -> skip
-                    end,
-                    {<<" -coalesce ">>,<<"-%04d.trim">>};
-                _NoAnimation -> {<<" ">>,<<".trim">>}
-            end,
-                
-            Cmd= <<"convert",Resize/binary,CmdOptions/binary,Original/binary,PngFormat/binary,Original/binary,CmdFileExt/binary>>,
-            
-            Port = erlang:open_port({spawn, Cmd},[exit_status]),
-            wf:info(?M,"Cut Open (~p): ~p ~p",[Port,ImageInfo,Cmd]),
-            Entry=#convert_entry{original=Original,port=Port,from=From,target=Target,group=Group,image_info=ImageInfo,stage=prepare},
-            {reply,ok,H#handler{state=[ Entry | S ]}};
+check_file(Path) ->
+    wf:info(?M,"(~p) Checking file info ~p",[self(),filename:basename(Path)]),
+    case image_info_file(Path) of
+        {ok,Info} ->
+            W=w(Info),
+            H=h(Info),
+            {MaxW,MaxH}=wf:config(erlach,upload_max_dimensions,{8688,6192}),
+            case W > MaxW orelse H > MaxH of
+                true -> {error,{high_resolution,W,H}};
+                false -> {ok,Info}
+            end;
+        Error -> Error
+    end.
+
+stage(#entry{infoA=#jpeg{},stage=starting,source=SP,destination=DP}=E) ->
+    Mem=wf:to_binary(wf:config(erlach,jpegtran_maxmemory,524288)),
+    Cmd=["jpegtran -copy none -optimize -maxmemory ",Mem," -outfile ",DP," ",SP],
+    {ok, Cmd, E#entry{stage=finishing}};
+stage(#entry{infoA=#png{},stage=starting,source=SP}=E)                ->
+    {ok, ["optipng ",wf:config(erlach,optipng_opts,"-o0")," ",SP],   E#entry{stage=optipng}};
+stage(#entry{infoA=#png{},stage=optipng, source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
+stage(#entry{infoA=#gif{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
+stage(#entry{infoA=#bpg{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}}.
+
+spawn_external(#entry{id=Key}=E,#state{entry_map=EM,port_map=PM}=S) ->
+    wf:info(?M,"(~p) Spawning for ~p",[self(),Key]),
+    case stage(E) of
+        {ok,Cmd,#entry{destination=DP}=E2} ->
+            Port=erlang:open_port({spawn, wf:to_binary(Cmd)},[exit_status]),
+            wf:info(?M,"(~p) Process ~p ~p",[self(),Port,Cmd]),
+            PM2=maps:put(Port,Key,PM),
+            EM2=maps:put(Key,E2#entry{port=Port},EM),
+            {ok,S#state{entry_map=EM2,port_map=PM2}};
+        Error -> Error
+    end.
+    
+reply_error(#entry{id=Key,target=T,meta=M,from=F}=E,Error,#state{}=S) ->
+    wf:info(?M,"(~p) Reply error ~p ~p",[self(),T,Error]),
+    D=case Error of {error,_} -> Error; _ -> {error,Error} end,
+    Msg=#pubsub{target=image,action=convert,element=Key,meta=M,data=D,from=F},
+    wf:send(T,{server,Msg}).
+reply_success(#entry{id=Key,target=T,meta=M,from=F,storage=Storage,path=Path,destination=DP,infoA=InfoA,infoB=InfoB}=E,#state{}=S) ->
+    wf:info(?M,"(~p) Reply success ~p ~p",[self(),T,Key]),
+    Msg=#pubsub{target=image,action=convert,element=Key,meta=M,data={ok,Storage,Path,filename:basename(DP),InfoA,InfoB},from=F},
+    wf:send(T,{server,Msg}).
+
+clear(#entry{id=Key,source=SP,port=Port}=E,#state{queue=Q,entry_map=EM,port_map=PM}=S) ->
+    wf:info(?M,"(~p) Clearing for ~p",[self(),Key]),
+    PM2=maps:remove(Port,PM),
+    EM2=maps:remove(Key,EM),
+    Q2=lists:delete(Key,Q),
+    file:delete(SP),
+    S#state{queue=Q2,entry_map=EM2,port_map=PM2}.
+
+find_entry(Port,#state{entry_map=EM,port_map=PM}) when is_port(Port) ->
+    wf:info(?M,"(~p) Find entry for ~p ~p ~p",[self(),Port,PM,EM]),
+    case maps:find(Port,PM) of
+        {ok,Key} -> maps:find(Key,EM);
+        E -> wf:info(?M,"(~p) Find entry error ~p in ~p",[self(),Port,E]), error
+    end.
+
+finally(#entry{id=Key,finally=Fun,destination=DP}=E,#state{entry_map=EM}=S) ->
+    wf:info(?M,"(~p) Exec finally fun for ~p",[self(),Key]),
+    {ok,InfoB}=image_info_file(DP),
+    E2=E#entry{infoB=InfoB},
+    {E4,EM2}=case case is_function(Fun,1) of true -> Fun(E2); false -> false end of
+        #entry{}=E3 -> {E3,maps:update(Key,E3,EM)};
+        _ -> {E2,maps:remove(Key,EM)}
+    end,
+    reply_success(E4,S),
+    S#state{entry_map=EM2}.
+
+error(#entry{id=Key,error=Fun,destination=DP}=E,Error,#state{entry_map=EM}=S) ->
+    wf:info(?M,"(~p) Exec error fun for ~p",[self(),Key]),
+    {E3,S2}=case case is_function(Fun,1) of true -> Fun(E); false -> false end of
+        #entry{}=E2 -> {E2,S#state{entry_map=maps:update(Key,E2,EM)}};
+        _ -> {E,clear(E,S)}
+    end,
+    reply_error(E3,Error,S),
+    S2.
+
+proc(init,#handler{group=G,class=C,name=N}=H) ->
+    wf:info(?M,"(~p) Converter worker started: ~p:~p:~p",[self(),G,C,N]),
+    {ok,H};
+proc(dump,#handler{state=#state{queue=Q,entry_map=EM,port_map=PM}=S}=H) ->
+    io:format("~p: (~p) Converter status queue count: ~p, entries count ~p~n",[?M,self(),length(Q),maps:size(EM)]),
+    io:format("  Queue list:~n",[]), [ io:format("    | ~p~n",[Qi]) || Qi <- Q ],
+    io:format("  Entry list:~n",[]), [ io:format("    | #{~p => ~p}~n",[EMk,EMv]) || {EMk,EMv} <- maps:to_list(EM) ],
+    io:format("  Port map list:~n",[]), [ io:format("    | #{~p => ~p}~n",[PMk,PMv]) || {PMk,PMv} <- maps:to_list(PM) ],
+    {reply,ok,H};
+proc({insert_entry,#entry{id=Key,source=SP,storage=Storage,path=Path}=E},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
+    wf:info(?M,"(~p) Insert entry ~p",[self(),Key]),
+    case check_file(SP) of
+        {ok,InfoA} ->
+            Q2=Q++[Key],
+            DP=destination(SP,Storage,Path,InfoA),
+            EM2=maps:put(Key,E#entry{stage=starting,infoA=InfoA,destination=DP},EM),
+            filelib:ensure_dir(DP),
+            self() ! {command,check_queue},
+            {reply,ok,H#handler{state=S#state{queue=Q2,entry_map=EM2}}};
         Error ->
-            wf:warning(?M,"Unsupperted file (~p): ~p",[Error,Original]),
+            error(E,Error,S),
             {reply,error,H}
     end;
-proc({target,Path,Target},#handler{state=S}=H) ->
-    wf:info(?M,"Linking target ~p with ~p~n~p",[Target,Path,S]),
-    case lists:keytake(Path,#convert_entry.original,S) of
-        {value, #convert_entry{}=E, S2} -> {reply,ok,H#handler{state=[ E#convert_entry{target=Target} | S2 ]}};
-        _ -> {reply,error,H}
-    end;
-% proc({convert,RelPath}) -> wf:info(?M,"Convert to BPG ~p",[1]);
-
+proc({command,check_queue},#handler{state=#state{queue=[]}}=H) ->
+    {reply,ok,H};
+proc({command,check_queue},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
+    wf:info(?M,"(~p) Check queue (~p items)",[self(), length(Q)]),
+    S3=case maps:get(hd(Q),EM) of
+        #entry{stage=starting}=E ->
+            case spawn_external(E,S) of
+                {ok,S2} -> wf:info(?M,"(~p) Check queue: SPAWN OK",[self()]), S2;
+                Error -> wf:info(?M,"(~p) Check queue: SPAWN ERROR",[self()]), error(E,Error,S)
+            end;
+        _ -> wf:info(?M,"(~p) Check queue: PROCESS",[self()]), S
+    end,
+    {reply,ok,H#handler{state=S3}};
+proc({upadate_entry,Key,Fun},#handler{state=#state{entry_map=EM}=S}=H) when is_function(Fun,1) ->
+    wf:info(?M,"(~p) Update entry",[self()]),
+    EM2=case maps:get(Key,EM,false) of
+        #entry{}=E ->  case Fun(E) of #entry{}=E2 -> maps:update(Key,E2,EM); _ -> EM end;
+        false -> EM
+    end,
+    {reply,ok,H#handler{state=S#state{entry_map=EM2}}};
+proc({abort_entry,Key},#handler{state=S}=H) -> % TODO:
+    wf:info(?M,"(~p) Aborting ~p",[self(),Key]),
+    {reply,ok,H};
+proc({Port,{exit_status,0}},#handler{state=#state{queue=Q,entry_map=EM,port_map=PM}=S}=H) ->
+    wf:info(?M,"(~p) Spawn finished ~p",[self(),Port]),
+    S3=case find_entry(Port,S) of
+        {ok,#entry{stage=finishing}=E} ->
+            S2=finally(E,S),
+            self() ! {command,check_queue},
+            clear(E,S2);
+        {ok,#entry{}=E} ->
+            case spawn_external(E,S) of
+                {ok,S2} -> S2;
+                Error -> error(E,Error,S)
+            end;
+        error ->
+            wf:warning(?M,"(~p) Skiping finishing ~p",[self(),Port]),
+            self() ! {command,check_queue},
+            S
+    end,
+    {reply,ok,H#handler{state=S3}};
 % получены данные Data от внешнего приложения
 % proc({Port,{data,Data}},H) -> {reply,ok,H};
 % ответ на {Port, close}
 % proc({Port,closed},H) -> {reply,ok,H};
 % ответ на {Port, {connect, NewPid}}
 % proc({Port,connected},H) -> {reply,ok,H};
-% передается если при создании порта использовалась опция exit_status и внешнее приложение завершило свою работу
-proc({Port,{exit_status,0}},#handler{state=S}=H) when is_port(Port) ->
-    case lists:keytake(Port,#convert_entry.port,S) of
-        {value, #convert_entry{original=Original,image_info=ImageInfo,stage=prepare}=Entry, S2} ->
-            file:delete(Original),
-            Converted=path(Original),
-            Quality=wf:to_binary(wf:config(erlach,bpg_quality,21)),
-            CompLevel=wf:to_binary(wf:config(erlach,bpg_compression_level,6)),
-            
-            {CmdOptions,CmdFile}=case ImageInfo of
-                #gif{animation=true,loop_count=LoopCount} ->
-                    DelayFile=case filelib:is_regular(<<Original/binary,".delays">>) of
-                        true -> <<"-delayfile ",Original/binary,".delays">>;
-                        false -> <<"-fps ",(wf:to_binary(wf:config(erlach,bpg_default_fps,15)))/binary>>
-                    end,
-                    {<<" -m ",CompLevel/binary," -b 8 -q ",Quality/binary," -a ",
-                        Original/binary,"-%4d.trim ",DelayFile/binary," -loop ",(wf:to_binary(LoopCount))/binary>>,<<>>};
-                _NoAnimation -> {<<" -m ",CompLevel/binary," -b 8 -q ",Quality/binary>>,<<" ",Original/binary,".trim">>}
-            end,
-            Encoder= case is_alpha(ImageInfo) of true -> <<" -e jctvc">>; false -> <<" -e x265">> end,
-            
-            Cmd= <<"bpgenc",Encoder/binary,CmdOptions/binary," -o ",Converted/binary,CmdFile/binary>>,
-                
-            Port2 = erlang:open_port({spawn, Cmd},[exit_status]),
-            wf:info(?M,"Converting to BPG (~p): ~p",[Port2,Cmd]),
-            Entry2=Entry#convert_entry{converted=Converted,port=Port2,stage=convert},
-            {reply,ok,H#handler{state=[ Entry2 | S2 ]}};
-        {value, #convert_entry{original=Original,converted=Converted,from=From,target=Target,group=Group,image_info=ImageInfo=#jpeg{},stage=convert}, S2} ->
-            wf:info(?M,"Jpeg converting (~p) finished",[Port]),
-            file:delete(Original),
-            reply(Target,From,Group,#pubsub{target=image,action=convert,element=Target,data={ok,Converted},from=From}),
-            {reply,ok,H#handler{state=S2}};
-        {value, #convert_entry{original=Original,converted=Converted,from=From,target=Target,group=Group,image_info=ImageInfo=#gif{},stage=convert}, S2} ->
-            wf:info(?M,"Gif fake converting (~p) finished",[Port]),
-            file:delete(Original),
-            reply(Target,From,Group,#pubsub{target=image,action=convert,element=Target,data={ok,Converted},from=From}),
-            {reply,ok,H#handler{state=S2}};
-        {value, #convert_entry{original=Original,converted=Converted,from=From,target=Target,group=Group,image_info=_,stage=convert}, S2} ->
-            wf:info(?M,"Converting to BPG (~p) finished",[Port]),
-            [ file:delete(F) || F <- filelib:wildcard(wf:to_list(<<Original/binary,"*.trim">>))],
-            file:delete(<<Original/binary,".delays">>),
-            reply(Target,From,Group,#pubsub{target=image,action=convert,element=Target,data={ok,Converted},from=From}),
-            {reply,ok,H#handler{state=S2}};
-        _ -> {reply,error,H}
-    end;
-proc({Port,{exit_status,Status}}=E,#handler{state=S}=H) when is_port(Port) ->
-    wf:error(?M,"Error event ~p",[E]),
-    case lists:keytake(Port,#convert_entry.port,S) of
-        {value, _, S2} -> {reply,error,H#handler{state=S2}};
-        _ -> {reply,error,H}
-    end;
+% передается если при создании порта использовалась опция exit_status и внешнее приложение завершило свою работу   
+proc({Port,{exit_status,_Status}=Reason},#handler{state=S}=H) when is_port(Port) ->
+    wf:error(?M,"(~p) Spawn failed with status ~p ~p",[self(),Reason,Port]),
+    S2=case find_entry(Port,S) of
+        {ok,#entry{}=E} -> wf:info(?M,"Error calling...",[]), error(E,{error,Reason},S);
+        _ -> wf:warning(?M,"(~p) Skiping clearing (entry not found) ~p",[self(),Port]), S
+    end,
+    {reply,error,H#handler{state=S2}};
 % работа порта была прервана
-% proc({'EXIT',Port,Reason},H) -> {reply,ok,H};
-
+proc({'EXIT',Port,Reason},H) -> proc({Port,{exit,Reason}},H);
 proc(Unknown,H) ->
     wf:warning(?M,"Unknown event ~p",[Unknown]),
     {reply,unknown,H}.
-
-clear_temporary(#rst{image=Name}) ->
-    wf:info(?M,"Clear temporary attachment",[]); % TODO:
-clear_temporary(Rst) -> wf:warning(?M,"Wrong state for clear temporary ~p",[Rst]).
-
-abort() -> clear.  % TODO:
 
 image_info_file(FileName) ->
     case file:read_file(FileName) of
         {ok,Data} ->
             case image_info(Data) of
-                {ok,Info} -> {ok,Info,Data};
+                {ok,Info} -> {ok,setelement(#image_info.size,Info,filelib:file_size(FileName))};
                 Error -> Error
             end;
         Error -> Error
     end.
 
-
-
 % http://dev.exiv2.org/projects/exiv2/wiki/The_Metadata_in_JPEG_files
 % http://stackoverflow.com/a/17848968
 % https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format#JFIF_APP0_marker_segment
 % http://vip.sugovica.hu/Sardi/kepnezo/JPEG%20File%20Layout%20and%20Format.htm <--
-image_info(<<255,216,Data/binary>>) ->
+image_info(<<255,216,Data/binary>>) -> % jpeg
     Foreach=fun Foreach(Offset) ->
         case binary:part(Data,Offset,2) of
             <<16#ff,SOFn>> when SOFn =:= 16#c0 orelse SOFn =:= 16#c2 ->
@@ -203,17 +243,21 @@ image_info(<<255,216,Data/binary>>) ->
         end
     end,
     Foreach(0);
-image_info(<<137,80, 78, 71, 13, 10, 26, 10,IHDR:25/binary,_/binary>>) ->
-    % Length= <<0,0,0,13>>,
-    % Type= <<73,72,68,82>>,
-    <<0,0,0,13,73,72,68,82,Data:13/binary,CRC:4/binary>>= IHDR,
+image_info(<<137,80,78,71,13,10,26,10,IHDR:25/binary,_/binary>>) -> % png
+    <<0,0,0,13,73,72,68,82,Data:13/binary,_CRC:4/binary>>= IHDR,
     <<W:32/big,H:32/big,Depth:8,Color:8,_Compression:8,_Filter:8,_Interlace:8>>=Data,
-    ColorType=case Color of 0 -> greyscale; 2 -> truecolor; 3 -> indexed; 4 -> 'grayscale-alpha'; 6 -> 'truecolor-alpha' end,
-    {ok,#png{width=W,height=H,bit_depth=Depth,color_type=ColorType}};
+    {ColorType,Alpha}=case Color of
+        0 -> {greyscale,false};
+        2 -> {truecolor,false};
+        3 -> {indexed,  false};
+        4 -> {grayscale,true};
+        6 -> {truecolor,true}
+    end,
+    {ok,#png{width=W,height=H,bit_depth=Depth,color_type=ColorType,alpha=Alpha}};
 % http://www.w3.org/Graphics/GIF/spec-gif89a.txt
 % http://giflib.sourceforge.net/whatsinagif/bits_and_bytes.html
 % http://www.onicos.com/staff/iz/formats/gif.html
-image_info(<<$G,$I,$F,$8,N,$a,W:16/little,H:16/little,GCTF:1,Res:3,StCT:1,SzGCT:3,BCI:8,PAR:8,_/binary>>=Data) when N =:= $7 orelse N =:= $9 ->
+image_info(<<$G,$I,$F,$8,N,$a,W:16/little,H:16/little,_GCTF:1,_Res:3,_StCT:1,SzGCT:3,_BCI:8,_PAR:8,_/binary>>=Data) when N =:= $7 orelse N =:= $9 -> % gif
     DataForeach=fun DataForeach(DataOffset) ->
         case binary:at(Data,DataOffset) of
             0 -> DataOffset+1;
@@ -221,7 +265,7 @@ image_info(<<$G,$I,$F,$8,N,$a,W:16/little,H:16/little,GCTF:1,Res:3,StCT:1,SzGCT:
         end
     end,
     
-    ExtensionForeach=fun ExtensionForeach({ExtOffset,#gif{delays=D,alpha=A}=G}) ->
+    ExtensionForeach=fun({ExtOffset,#gif{delays=D,alpha_frames=A}=G}) ->
         case binary:at(Data,ExtOffset) of
             255 -> % Application Extension Block
                 DataOffset=ExtOffset+2+binary:at(Data,ExtOffset+1),
@@ -233,26 +277,29 @@ image_info(<<$G,$I,$F,$8,N,$a,W:16/little,H:16/little,GCTF:1,Res:3,StCT:1,SzGCT:
             249 ->
                 <<_Reserved:3,_Disposal:3,_User:1,Transparent:1>>= binary:part(Data,ExtOffset+2,1),
                 <<Delay:16/little>>= binary:part(Data,ExtOffset+3,2),
-                {ExtOffset+2+binary:at(Data,ExtOffset+1)+1,G#gif{delays=[Delay|D],alpha=A+Transparent}}; % Graphic Control Extension Block
+                {ExtOffset+2+binary:at(Data,ExtOffset+1)+1,G#gif{delays=[Delay|D],alpha_frames=A+Transparent}}; % Graphic Control Extension Block
             1 -> {DataForeach(ExtOffset+14),G} % Plain Text Extension Block
         end
     end,
     
     BlockForeach=fun BlockForeach({BlockOffset,#gif{frames=F}=G}) ->
         case binary:at(Data,BlockOffset) of
-            33 -> BlockForeach(ExtensionForeach({BlockOffset+1,G})); % Extension Block
+            33 ->
+                BlockForeach(ExtensionForeach({BlockOffset+1,G})); % Extension Block
             44 -> % Image Block
                 SizeLCT=case <<(binary:at(Data,BlockOffset+9)):8>> of
                     <<0:1,_:7>> -> 0;
                     <<1:1,_:4,Size:3>> -> trunc(math:pow(2,Size+1)*3)
                 end,
                 BlockForeach({DataForeach(BlockOffset+10+SizeLCT+1),G#gif{frames=F+1}});
-            59 -> {ok,G}
+            59 ->
+                {ok,G}
         end
     end,
-    {ok,Gif}=BlockForeach({13+trunc(math:pow(2,SzGCT+1)*3),#gif{alpha=0,frames=0,loop_count=0,delays=[]}}),
-    {ok,Gif#gif{animation=Gif#gif.frames > 1,delays=lists:reverse(Gif#gif.delays),width=W,height=H}};
-image_info(<<16#425047fb:32,PF:3/big,A1:1,BD:4/big,CS:4/big,E:1,A2:1,LR:1,AN:1,D:8/binary,_/bitstring>>) ->
+    OffsetGCT=case SzGCT of 0 -> 0; _ -> trunc(math:pow(2,SzGCT+1)*3) end,
+    {ok,Gif}=BlockForeach({13+OffsetGCT,#gif{alpha_frames=0,frames=0,loop_count=0,delays=[]}}),
+    {ok,Gif#gif{animation=Gif#gif.frames > 1,alpha=Gif#gif.alpha_frames > 0,delays=lists:reverse(Gif#gif.delays),width=W,height=H}};
+image_info(<<16#425047fb:32,PF:3/big,A1:1,BD:4/big,CS:4/big,E:1,A2:1,LR:1,AN:1,D:8/binary,_/bitstring>>) -> % bpg
     
     ReadUE7 = fun ReadUE7(<<1:1,Byte7:7,Tail/binary>>,Number) ->
             ReadUE7(Tail,<<Number/bitstring,Byte7:7>>);
@@ -278,7 +325,7 @@ image_info(<<16#425047fb:32,PF:3/big,A1:1,BD:4/big,CS:4/big,E:1,A2:1,LR:1,AN:1,D
                 4 -> '4:2:0-mpeg2';
                 5 -> '4:2:2-mpeg2' end,
             alpha=case {A1,A2} of
-                {0,0} -> no_alpha;
+                {0,0} -> false;
                 {1,0} -> alpha_color_not_premultiplied;
                 {1,1} -> alpha_color_premultiplied;
                 {0,1} -> alpha_CMYK end,
@@ -291,18 +338,11 @@ image_info(<<16#425047fb:32,PF:3/big,A1:1,BD:4/big,CS:4/big,E:1,A2:1,LR:1,AN:1,D
                 4 -> {'YCbCr', 'BT 2020', 9};
                 5 -> { reserved, 'BT 2020', undefined};
                 _ -> { reserved, undefined, undefined} end,
-            extension_present=case E of 0 -> false; 1 -> true end,
-            limited_range=case LR of 0 -> false; 1 -> true end,
-            animation=case AN of 0 -> false; 1 -> true end,
+            extension_present = E =/= 0,
+            limited_range = LR =/= 0,
+            animation = AN =/= 0,
             width=W,
             height=H}};
         _ -> {error,bpg_wrong_data}
     end;
 image_info(_) -> {error,unknown_image_format}.
-
-
-t_l(L) -> lists:foldr(fun(A,Acc) -> [A|Acc] end, [], L).
-    
-    
-
-

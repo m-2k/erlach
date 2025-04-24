@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+        <title>Erlach Services</title>
+        <style>
+            body { margin: 0px; }
+            #erlach-acf { display: none; }
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id='erlach-acf'>
+            <iframe src='http://localhost:8000/services/mv/2z' frameborder="0" scrolling="no"></iframe>
+        </div>
+        <script>
+            (function() { var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+                window.webkitRequestAnimationFrame || window.msRequestAnimationFrame; })();
+            window.addEventListener('message', function(e){
+                var d = e.data;
+                var ok = d instanceof Object && d.service === 'erlach' && d.api === 3;
+                switch(d.action) {
+                    case 'resize':
+                        var eacf = document.getElementById('erlach-acf');
+                        if(eacf) {
+                            requestAnimationFrame((function() {
+                                eacf.style.height = parseInt(d.height) + 'px';
+                                eacf.style.display = 'block';
+                                console.log('resized');
+                            }).bind(this));
+                        }
+                        break;
+                    default: console.log(d);
+                }
+            },false);
+        </script>
+    </body>
+</html>

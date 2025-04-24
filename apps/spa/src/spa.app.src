@@ -1,0 +1,9 @@
+{application, spa,
+  [
+    {description, "N2O Toolkit for Single Page Applications"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib]},
+    {mod, { spa, []}},
+    {env, []}
+  ]}.

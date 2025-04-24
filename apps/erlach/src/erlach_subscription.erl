@@ -40,7 +40,7 @@ put(#post{type=post,id=Pid,links=Links}=P,#st{board=#board{id=Bid}=B,thread=#pos
         _ -> Links
     end,
     ls_put(P,{ok,post,{Bid,Tid,PrevLinks,Links}});
-put(#post{type=thread,id=Tid,links=Links}=T,#st{board=#board{id=Bid}=B,level=From}=S) -> % TODO: + send copy to browser localStorage
+put(#post{type=thread,id=Tid,links=Links}=T,#st{board=#board{id=Bid}=B,level=_From}=S) -> % TODO: + send copy to browser localStorage
     wf:info(?M,"put/thread ~p",[self()]),
     
     #feed{top=Top,count=Count}=F=case kvs:get(feed,{post,Tid}) of {ok,Fd} -> Fd; _ -> #feed{top=?UNDEF,count=0} end, 
@@ -76,10 +76,8 @@ reset(#hes{post=#post{id=Pid}=P,scope=Scope}) ->
 reset(#hes{post=?UNDEF,thread=#post{type=thread,id=Tid}=T,scope=Scope}) ->
     wf:info(?M,"reset/thread ~p",[self()]),
     #feed{top=Top,count=Count}=F=case kvs:get(feed,{post,Tid}) of {ok,Fd} -> Fd; _ -> #feed{top=?UNDEF,count=0} end, 
-    % TLC={Top,Links,Count},
     case erlang:get(key(T)) of
         {ok,thread,{Bid,{PT,PL,PC},{T1,L1,C1}}} ->
-            % Cur={Bid,TLC,TLC},
             {ok,#board{}=B}=kvs:get(board,Bid),
             Data=case Scope of
                 thread_answers -> {Bid,{PT,L1,PC},{T1,L1,C1}};
@@ -130,34 +128,39 @@ render(#post{type=thread,id=Tid,links=L2}=T,#hes{scope=Scope,board=#board{id=Bid
 render(info,#hes{thread=#post{id=Tid,type=thread}=T,scope={{Bid,{PT,PL,PC},{T1,L1,C1}},{DeltaL,DeltaC}},board=B}) ->
     LP=#post{type=post,id=PT,urn=erlach_qs:id_to_urn(case PT of ?UNDEF ->Tid; _ -> PT end)},
     #span{id=panel_id(T,info),body=[
-        #button{class=sea,body=[<<"A+">>,wf:to_list(DeltaL)], % new answers of thread
-            postback=#pubsub{target=subscription,action=view,element=erlach_qs:mp({post,B,T,T}),data=#hes{thread=strip(T),scope=thread_answers},from=self()}},
-        #button{class=sea,body=[<<"P+">>,wf:to_list(DeltaC)], % new posts in thread
-            postback=#pubsub{target=subscription,action=view,element=erlach_qs:mp({post,B,T,LP}),data=#hes{thread=strip(T),scope=thread_posts},from=self()}},
-        #button{class=[sea,checked],body=[<<"&#10006;">>],postback=#pubsub{target=subscription,action=remove,data=Tid,from=self()}}
+        #button{class=sea,body=[<<"Replies +"/utf8>>,wf:to_list(DeltaL)], % new answers of thread
+           title= <<"New Replies">>, postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,T}),
+               data=#hes{thread=strip(T),scope=thread_answers},from=self()}},
+        #button{class=sea,body=[<<"Posts +"/utf8>>,wf:to_list(DeltaC)], % new posts in thread
+            title= <<"New Posts">>,
+            postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,LP}),
+                data=#hes{thread=strip(T),scope=thread_posts},from=self()}},
+        #button{class=[sea,checked],body=[<<"&#10006;">>],
+            postback=#pubsub{render=?M,target=subscription,action=remove,data=Tid,from=self()}}
     ]};
 render(#post{type=post,urn=Urn,links=L2}=P,#hes{scope={Old,Delta},thread=T,board=B}=Hes) ->
     #button{id=panel_id(P,post),class=[orange,slim],
-        body=[<<"#">>,Urn,<<"+">>,wf:to_list(Delta)], % answers of post
-        postback=#pubsub{target=subscription,action=view,element=erlach_qs:mp({post,B,T,P}),data=#hes{post=strip(P),thread=strip(T)},from=self()}}.
+        body=[<<"#">>,Urn,<<"+">>,wf:to_list(Delta)], % answers of post        
+            postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,P}),
+                data=#hes{post=strip(P),thread=strip(T)},from=self()}}.
 
 event(#pubsub{target=subscription,action=put,element=#post{}=P,data=#st{}=S,from=F}) ->
     wf:info(?M,"Pubsub subscription PUT from ~p",[self()]),
-
     update(P,F,S);
 event(#pubsub{target=subscription,action=view,element=#postback{}=P,data=#hes{}=H,from=F}) ->
     wf:info(?M,"Pubsub subscription VIEW from ~p to ~p",[F,self()]),
     reset(H),
-    ?SPA:redirect(P);
+    spa:redirect(P);
 event(#pubsub{target=subscription,action=remove,data=Tid,from=F}) ->
     wf:info(?M,"Pubsub subscription REMOVE from ~p to ~p",[F,self()]),
     remove(Tid);
 event(Unknown) -> ?EVENT_ROUTER:unknown(?M,Unknown).
 
 
-pickup_data() -> wf:wire(lambda_event:new(?M,#pubsub{target=subscription,action=pickup},"sub()")).
+pickup_data() -> wf:wire(spa_lambda_event:new(?M,#pubsub{render=?M,target=subscription,action=pickup},"sub()")).
 
 api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
+    wf:info(?M,"Api Event: subscription",[]),
     LsRem=fun(Type,Id) ->
         wf:wire(wf:f("lsrem(['sub','~s',~b]);",[Type,Id]))
     end,
@@ -165,7 +168,7 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             wf:info(?M,"SUB P ~p ~p ~p (~p ~p) (~p ~p)",[Tid,Timestamp,Bid,PT,T1,PC,C1]),
 
             case {kvs:get(board,Bid),kvs:get(post,Tid)} of
-                {{ok,B},{ok,T}} ->
+                {{ok,B},{ok,#post{type=thread}=T}} ->
                     erlang:put(key(thread,Tid),{ok,thread,{Bid,{PT,PL,PC},{T1,L1,C1}}}), % TODO: REFACTOR THIS HELL
                     put(T#post{links=L1},#st{board=B}),
                     [Tid|Acc];
@@ -178,7 +181,7 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             wf:info(?M,"SUB P ~p ~p ~p ~p",[Pid,Timestamp,Bid,Tid]),
 
             case {kvs:get(board,Bid),kvs:get(post,Tid),kvs:get(post,Pid)} of
-                {{ok,B},{ok,T},{ok,P}} ->
+                {{ok,B},{ok,#post{type=thread}=T},{ok,#post{type=post}=P}} ->
                     erlang:put(key(post,Pid),{ok,post,{Bid,Tid,PL,L1}}), % TODO: REFACTOR THIS HELL
                     put(P#post{links=L1},#st{board=B,thread=T}),
                     [Tid|Acc];
@@ -188,4 +191,5 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             end;
         (_,Acc) -> Acc end,TidList1,SubList),
     [ wf:reg({subscription,thread,TX}) || TX <- lists:usort(TidList2)];
+    % wf:info(?M,"SUB ~p ~p",[self(),list()]);
 api_event(Unknown,_,_) -> ?EVENT_ROUTER:unknown(?M,Unknown).

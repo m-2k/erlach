@@ -17,7 +17,7 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](erlach-R2-january-2016.png)
+![Screenshot](erlach-R3-RC5-october-2016-white.png)
 
 
 ## Requirements
@@ -25,7 +25,6 @@
 * Unix
 * [Erlang/OTP 18](https://github.com/kerl/kerl?tab=readme-ov-file#using-kerl)
 * libjpeg-progs (`apt-get install libjpeg-progs`)
-* [ImageMagick](https://imagemagick.org/)
 * [libbpg](https://bellard.org/bpg/)
 * inotify-tools (optional for live code reload)
 
@@ -41,20 +40,14 @@ docker run --rm -it -p 8000:8000 -v "$(pwd)":/app -w /app erlang:18.3.3 bash
 git config --system url."https://github.com/".insteadOf git://github.com/
 ```
 
-3. Patch `ux` library
-```sh
-sed -i '314s|-spec freq(string()) -> dict().|-spec freq(string()) -> dict:dict().|' deps/ux/src/ux_string.erl
-sed -i '21s|key2server :: dict()|key2server :: dict:dict()|' deps/ux/src/unidata/ux_unidata_filelist.erl 
-```
-
-4. Get dependencies, compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
+3. Get dependencies, compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
 ```sh
 ./mad deps compile repl
 ```
 
 4. Init Erlach database into ERTS terminal
 ```erlang
-erlach_db:init().
+erlach_db:init_db().
 ```
 
 5. Open URL [http://localhost:8000/](http://localhost:8000/) on host system

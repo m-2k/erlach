@@ -12,21 +12,35 @@ stop(_) -> ok.
 start_link() -> supervisor:start_link({local,?MODULE},?MODULE,[]).
 init([]) -> {ok, {{one_for_one,5,10}, []} }.
 
+%% rotation chunk length
+limit(_Table, _Key) -> 250000.
+%% change schema the table if count more than:
+forbid(_Table) -> 5.
+
+fold_check() ->
+    case kvs:get(feed,{board,10}) of
+        {ok, #feed{top=Top,count=Count}} ->
+            kvs:fold(fun(T,Acc) -> [ T | Acc] end,[],board,Top,Count,#iterator.prev);
+        _ -> []
+    end.
+
 metainfo() ->
     #schema{name=kvs,tables=[
         #table{name=party,container=feed,fields=record_info(fields,party),keys=[]},
         #table{name=board,container=feed,fields=record_info(fields,board),keys=[urn]},
         #table{name=post,container=feed,fields=record_info(fields,post),keys=[]},
-        #table{name=attachment,container=feed,fields=record_info(fields,attachment),keys=[]}
+        #table{name=attachment,container=feed,fields=record_info(fields,attachment),keys=[]},
+        #table{name=statistic,fields=record_info(fields,statistic),keys=[]}
         ]}.
 
-init() ->
+init_db() ->
+    kvs:count(board) =:= 0, % guard
     Group=fun(Name,Desc,Boards) ->
         Gid=kvs:next_id(party,1),
-        kvs:add(#party{id=Gid,created=erlang:system_time(),
+        kvs:add(#party{id=Gid,created=erlang:timestamp(),
             name=Name,desc=Desc}),
         lists:foreach(fun({BoardUrn,BoardName,BoardDesc}) ->
-            kvs:add(#board{id=kvs:next_id(board,1),created=erlang:system_time(),
+            kvs:add(#board{id=kvs:next_id(board,1),created=erlang:timestamp(),
                 feed_id={board,Gid},name=BoardName,urn=BoardUrn,desc=BoardDesc})
             end,Boards)
         end,
@@ -113,12 +127,36 @@ init() ->
     ]),
     ok.
 
+add_board(eot) -> add_board(9,<<"eot">>,<<"Есть Одна Тян"/utf8>>,<<"Одна из миллиардов"/utf8>>);
+add_board(a) -> add_board(8,<<"Аниме"/utf8>>,<<"a">>,<<"Лунная призма, дай мне силу"/utf8>>).
+add_board(Party,Urn,Name,Desc) ->
+    kvs:add(#board{id=kvs:next_id(board,1),created=erlang:timestamp(),feed_id={board,Party},
+        name=wf:to_binary(Name),urn=wf:to_binary(Urn),desc=wf:to_binary(Desc)}).
+    
+hide_board(N) -> [#board{}=B]=kvs:index(board,urn,wf:to_binary(N)), kvs:put(B#board{hidden=true}).
+
+% updating all schemas of tables
+update_schema() -> update_schema(undefined).
+update_schema(Default) ->
+    [ {N, mnesia:transform_table(N,fun(X) -> new_record(N,X,F,Default) end, F)} || #table{name=N, fields=F} <- (metainfo())#schema.tables ].
+new_record(N,R,F,_) when N =:= element(1,R), size(R) =:= length(F) + 1 -> R;
+new_record(Name,Record,NewFields,Default) ->
+    {_,NR}=lists:foldl(fun(_,{Index,Acc}) ->
+        V=case Index > size(Record) of true -> Default; _ -> element(Index,Record) end,
+        {Index - 1, [V | Acc]}
+        end,{length(NewFields) + 1, []},[ Name | NewFields ]),
+    setelement(1,list_to_tuple(NR),Name).
+    
+ec() -> kvs:add(#party{id=kvs:next_id(party,1),feed_id=comments,created=erlang:timestamp(),name= <<"Comment Services">>,desc= <<"Erlach anonymous comments as service">>,hidden=true}).
+ecb() -> kvs:add(#board{id=kvs:next_id(board,1),created=erlang:timestamp(),
+                feed_id={board,13},name= <<"GitHub">>,desc= <<"github.io">>,urn= <<"github.io">>}).
+
 % threads in board 1
 populate() ->
     Bid = 1,
     Thread=fun() ->
         Pid=kvs:next_id(post,1),
-        kvs:add(#post{type=thread,id=Pid,created=erlang:system_time(),feed_id={thread,Bid},urn=erlach_utils:id_to_urn(Pid),
+        kvs:add(#post{type=thread,id=Pid,created=erlang:timestamp(),feed_id={thread,Bid},urn=erlach_utils:id_to_urn(Pid),
             name_escaped=wf:to_binary(wf:temp_id()),message_escaped=wf:to_binary(wf:temp_id())})
         end,
     [ Thread() || _ <- lists:seq(1,10) ],
@@ -130,7 +168,7 @@ populate(Tid,Count) when is_integer(Tid)->
     {ok,T}=kvs:get(post,Tid),
     Post=fun() ->
         Pid=kvs:next_id(post,1),
-        kvs:add(#post{id=Pid,created=erlang:system_time(),feed_id={post,Tid},type=post,
+        kvs:add(#post{id=Pid,created=erlang:timestamp(),feed_id={post,Tid},type=post,
             urn=erlach_qs:id_to_urn(Pid),message_escaped=wf:to_binary(wf:temp_id())})
     end,
-    utils:times(Post,Count).
+    spa_utils:times(Post,Count).

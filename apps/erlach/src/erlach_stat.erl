@@ -20,7 +20,7 @@ incr(attachment,Count,{Bid,Tid,#attachment{}}) ->
     do_incr({attachment,board,Bid},Count);
 incr(thread,Count,{Bid,#post{type=thread}}) ->
     do_incr({thread,total},Count),
-    do_incr({thread,Bid},Count);
+    do_incr({thread,board,Bid},Count);
 incr(post,Count,{Bid,Tid,#post{type=post,sage=Sage}}) ->
     do_incr({post,total},Count),
     do_incr({post,thread,Tid},Count),
@@ -32,6 +32,7 @@ incr(post,Count,{Bid,Tid,#post{type=post,sage=Sage}}) ->
             do_incr({post,sage,board,Bid},Count);
         false -> skip
     end.
+    
 
 ts() -> erlang:monotonic_time(seconds).
 time_start(#st{board=Bd,thread=Th}=S) ->
