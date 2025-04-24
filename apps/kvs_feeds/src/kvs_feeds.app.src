@@ -1,0 +1,9 @@
+{application, kvs_feeds,
+  [
+    {description, "KVS feed-server"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib, kvs]},
+    {mod, { kvs_feeds, []}},
+    {env, []}
+  ]}.

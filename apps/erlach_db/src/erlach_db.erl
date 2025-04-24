@@ -126,6 +126,13 @@ init_db() ->
         {<<"wd"/utf8>>, <<"Web девелопинг"/utf8>>, <<""/utf8>>}        
     ]),
     ok.
+    
+add_party(N,D,H) -> kvs:add(#party{id=kvs:next_id(party,1),created=erlang:timestamp(),name=N,desc=D,hidden=H}).
+
+
+int() ->
+    {ok,#party{id=P}}=add_party(<<"INTERNATIONAL">>,<<"">>,false),
+    add_board(P,<<"~b">>,<<"/B/ullshit">>,<<"Welcome back, bitard">>,false).
 
 add_board(fap) -> add_board(11,<<"fapfapfapchan.ga">>,<<"Фапчан"/utf8>>,<<"Оверчан всех порнографических досок галактики"/utf8>>,false);
 add_board(rf) -> add_board(9,<<"rf">>,<<"Убежище"/utf8>>,<<"Хиккую как хочу"/utf8>>,true);

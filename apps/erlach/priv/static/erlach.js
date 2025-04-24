@@ -10,16 +10,29 @@ var enc_queue_2 = [];
 var enc_process_1;
 var enc_process_2;
 var time_warp = 0;
+var language;
 
 var URI_GOOGLE_IMG_SEARCH='https://www.google.com/searchbyimage?&image_url=';
 var URI_TINEYE_IMG_SEARCH='https://www.tineye.com/search?pluginver=bookmark_1.0&url=';
+var URI_SAUCENAO_IMG_SEARCH='https://saucenao.com/search.php?url=';
+var URI_IQDB_IMG_SEARCH='https://iqdb.org/?url=';
+var URI_WHATANIME_IMG_SEARCH='https://whatanime.ga/?url=';
 
 var lazyLoader;
-var bpgw = new Worker('/static/bpgdec.min.js');
+var bpgw;
+
+function getBPGWorker() {
+    if(!bpgw) {
+        bpgw = new Worker('/static/bpgdec.min.js');
+        bpgw.onmessage = BPGOnMessage;
+    };
+    return bpgw;
+}
 
 (function() {
     window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-        window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || function(callback) {
+        window.setTimeout(callback, 1000 / 60); };
 })();
 
 (function() {
@@ -50,12 +63,15 @@ function init(page_id) {
     enc_process_2 = false;
     upload_queue = [];
     
+    language = ls(['opt','language']) || 'ru';
+    
+    var v = qi('viewer'); v && (v.className = '');
+    
     // Run funs
     textStore();
 };
 function finalize() {
     debug && console.log('finalize');
-    
     page_loaded = true;
     var h = qi('header'); h && h.classList.remove('loading');
 }
@@ -103,13 +119,19 @@ function message(text,className,time) {
     var pm = qi('popup-messages');
     if(pm) {
         var b = qn('button');
-        b.classList.add(className || 'info')
-        b.innerText = text;
-        b.onclick = function(e){ e.target.remove(); };
-        window.setTimeout((function(){ this && this.click() }).bind(b),time || text.length*100+4000);
+        className = className || 'info';
+        b.classList.add(className);
+        b.innerHTML = text;
+        b.onclick = function(e){ b.remove(); };
+        window.setTimeout(function(){ b && b.click(); },time || text.length*100+4000);
         pm.insertAdjacentElement('afterbegin', b);
     }
 };
+
+function highlight(className,time) {
+    document.body.classList.add(className || 'info');
+    window.setTimeout(function(){  document.body.classList.remove(className || 'info') }, time || 700);
+}
 
 function nodeName(e) { return (e && e.nodeName) ? e.nodeName.toLowerCase() : 'unknown'; }
 function collapse(id) { ls(['hdn',id],true); render(id); };
@@ -140,18 +162,17 @@ function render(id) {
         x = e.querySelector('.pid');
         x && ( x.innerHTML = e.dataset.id );
         
-        render_time(e.querySelector('.time'));
-        
-        var l, lid, linkList = e.querySelectorAll('a.link');
+        var linkList = e.querySelectorAll('a.link');
         for(var i=0; i < linkList.length; i++) {
-            l = linkList[i];
-            lid = l.dataset.link;
-            if(lid) {
-                l.onclick = (function() { scrollToPost(this) }).bind(lid) ;
-                l.onmouseenter = (function() { flashPost(this) }).bind(lid);
-            } 
-            
-        }
+            var a = linkList[i];
+            var l = a.getAttribute('data-link');
+            if(l) {
+                a.onclick = (function() { scrollToPost(this) }).bind(l) ;
+                a.onmouseenter = (function() { flashPost(this) }).bind(l);
+            }
+        }        
+        render_time(e.querySelector('.time'));
+        render_embed(e);
     }
 };
 function render_time(e) {
@@ -170,16 +191,50 @@ function render_image(id) {
         
     }
 };
+function render_embed(e) {
+    if(ls(['opt','no-soundcloud'])) return;
+    
+    var sc = e.querySelectorAll('a[href^="https://soundcloud.com/"]');
+    for(var i = 0; i < sc.length; i++) {
+        
+        if(!sc[i].href.match(/https:\/\/soundcloud\.com\/[^\/]+\/[^\/]+(?:\/|$)/i)) continue;
+        
+        (function (link){
+            var url = 'https://soundcloud.com/oembed';
+            var req = new XMLHttpRequest();
+            var multi = !!(link.href.match(/https:\/\/soundcloud\.com\/[^\/]+\/(?:sets|tracks)(?:\/|$)/i));
+            var body = 'format=json&iframe=true' + (multi ? '' : '&maxheight=81') + '&url=' + encodeURIComponent(link.href);
+
+            req.open('POST', url, true);
+            req.responseType = 'json';
+            req.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            req.onreadystatechange = function() {
+                if (req.readyState === 4) {
+                    if (req.status != 200) { console.error('Embed status: ' + req.status); }
+                    else if(link) {
+                        var r = req.response;
+                        var w = document.createElement('div');
+                        w.classList.add('soundcloud-embed');
+                        w.innerHTML = multi ? r.html.replace('visual=true&','') : r.html;
+                        replaceNode(link,w);
+                    }
+                }
+            }
+            req.send(body);
+        })(sc[i]);
+    }
+};
 
 function format_timestamp(ts) {
     var diff = (Date.now() - new Date(ts) + time_warp)/1000;
-    var t = Math.trunc(diff/60/60/24/365); if(t > 0) return t + " г";
-        t = Math.trunc(diff/60/60/24/30);  if(t > 0) return t + " мес";
-        t = Math.trunc(diff/60/60/24);     if(t > 0) return t + " дн";
-        t = Math.trunc(diff/60/60);        if(t > 0) return t + " ч";
-        t = Math.trunc(diff/60);           if(t > 0) return t + " мин";
+    var t = Math.trunc(diff/60/60/24/365); if(t > 0) return t + '<span class="ru"> г</span><span class="en"> Y</span>';
+        t = Math.trunc(diff/60/60/24/30);  if(t > 0) return t + '<span class="ru"> мес</span><span class="en"> Mh</span>';
+        t = Math.trunc(diff/60/60/24);     if(t > 0) return t + '<span class="ru"> дн</span><span class="en"> D</span>';
+        t = Math.trunc(diff/60/60);        if(t > 0) return t + '<span class="ru"> ч</span><span class="en"> h</span>';
+        t = Math.trunc(diff/60);           if(t > 0) return t + '<span class="ru"> мин</span><span class="en"> min</span>';
     return  Math.trunc(diff) + " сек";
 };
+
 
 
 // 
@@ -190,7 +245,7 @@ function unrich(id) {
     var x = qi(id);
     x && x.addEventListener('paste', function(e) {
         e.preventDefault();
-        var text = e.clipboardData.getData('text/plain');
+        var text = e.clipboardData.getData('text/plain'); //.replace(/\r?\n/g,'<br/>');
         document.execCommand('insertHTML',false, text);
     });
 }
@@ -290,7 +345,11 @@ window.addEventListener('popstate', function(e){
         window.document.title = s.title; }
 },false);
 
-function textStoreKey(key) { return ['text',[history.state.board,history.state.thread],key]; };
+function textStoreKey(key) {
+    if(history.state && history.state.board) {
+        return ['text',[history.state.board,history.state.thread],key];
+    }
+};
 function textStore() {
     var store = function(sel,key) {
         var e = qs(sel), k = textStoreKey(key);
@@ -317,10 +376,11 @@ function textRestore() {
         var hideTimer; // There is no need to save
 
         var hideDrag = function() {
-            hideTimer = window.setTimeout(function() { drag.style.display = "none"; }, 50);
+            hideTimer = window.setTimeout(function() { drag.style.display = "none"; snowStart(); }, 10);
         };
 
         document.body.addEventListener("dragover", function(e) {
+            snowPause();
             e.stopPropagation();
             e.preventDefault();
             if (hideTimer) { clearTimeout(hideTimer); }
@@ -339,6 +399,7 @@ function textRestore() {
 function uploadFileStarting(state) {
     debug && console.log('uploadFileStarting');
     var p = qs('#input .image-process');
+    // p && p.innerText = state;
     p && p.classList.remove('error');
     p && p.classList.add('visibled');
     var m = qs('#input .image-manage');
@@ -402,7 +463,7 @@ function previewAndUploadFile(file) {
         var reader  = new FileReader();
         reader.onloadend = function () {
             temp.onload = function () {
-                setTimeout((function(cid) { uploadFile(cid, file, this.width, this.height) }).bind(this,container.id), 10);
+                setTimeout((function(cid) { uploadFile(cid, file, this.width, this.height) }).bind(this,container.id), 4);
                 if(file.type == 'image/gif') {
                     img.onload = function() {
                         this.onload = undefined;
@@ -443,7 +504,7 @@ function previewAndUploadBpgFile(file) {
             
             var meta = {container:'input', mime:'image/bpg', page_id:pid };
             var item = {type:'image', img:reader.result, meta:meta };
-            bpgw.postMessage(item);
+            getBPGWorker().postMessage(item);
             qs('#input .post-image').classList.remove('empty');
         };
         reader.readAsArrayBuffer(file);
@@ -482,7 +543,7 @@ function setActionOnImage(e) {
     }
 };
 
-bpgw.onmessage = function(e) {
+var BPGOnMessage = function(e) {
     debug && console.log('bpgw.onmessage');
     switch(e.data.type) {
         case 'log': console.log('Worker log: ' + e.data.message); break;
@@ -578,6 +639,7 @@ function animate(fun_or_e, animation) {
     window.setTimeout(function() { setup(take(fun_or_e), animation); }, 4);
 }
 
+
 /*********************** VIEWER BEGIN ***********************/
 
 var viewer;
@@ -628,7 +690,7 @@ function viewerShowImage(e) {
                 url = p.dataset.url;
                 n.bpg = e.bpg;
                 
-                if(n.bpg.animation) {
+                if(n.bpg && n.bpg.animation) {
                     setBPGAnimation(n);
                     n.pause();
                     
@@ -647,11 +709,15 @@ function viewerShowImage(e) {
     
     replaceNode(viewer.image, n);     // first step (thread #0)
     viewer.image = n;
-    qi('viewer-download').href=url;
+    qi('viewer-download').href=url.replace(new RegExp('^(' + location.origin + ')/static'),'$1/download');
     qi('viewer-google').href=URI_GOOGLE_IMG_SEARCH+encodeURIComponent(url);
     qi('viewer-tineye').href=URI_TINEYE_IMG_SEARCH+encodeURIComponent(url);
+    qi('viewer-saucenao').href=URI_SAUCENAO_IMG_SEARCH+encodeURIComponent(url);
+    qi('viewer-iqdb').href=URI_IQDB_IMG_SEARCH+encodeURIComponent(url);
+    qi('viewer-whatanime').href=URI_WHATANIME_IMG_SEARCH+encodeURIComponent(url);
     
     if(!viewer.active) {
+        // !(url && url.endsWith('.gif')) && vieverAnimate('bounceIn');
         viewerOpen(e);
     }
 };
@@ -750,7 +816,7 @@ function shadowOnLoadBpg(container) {
     req.onload = function(e) {
         var meta = {container:container, mime:'image/bpg', page_id:pid };
         var item = {type:'image', img:req.response, meta:meta };
-        bpgw.postMessage(item);
+        getBPGWorker().postMessage(item);
     }
     req.send();
 };
@@ -845,9 +911,29 @@ function fastCanvasResampler(c, i, maxw, maxh, fill) {
 }
 
 // 
+// Callbacks
+// 
+
+function onAddPostSelf() {
+    if(qs('.face')) {
+        animate(function() { return qs('.face'); }, 'top-sliding');
+    }
+};
+
+//
+// https://1chan.ca/live/
+//
+function cacachSender(url,desc) {
+    if(location.hostname === 'localhost' || ls(['opt','no-cacach'])) return;
+    (new Image()).src = "https://1chan.ca/live/addXS/?link=" +
+        encodeURIComponent(location.protocol+'//'+location.host+url) +
+        '&description='+encodeURIComponent(desc+' – Erlach');
+};
+
+// 
 // Settings
 // 
-function getValue(e) {
+function getNodeValue(e) {
     switch (nodeName(e)) {
         case 'input':
             switch (e.getAttribute("type").toLowerCase()) {
@@ -857,7 +943,7 @@ function getValue(e) {
         default: return e.value;
     };
 }
-function setValue(e,v) {
+function setNodeValue(e,v) {
     switch (nodeName(e)) {
         case 'input':
             switch (e.getAttribute("type").toLowerCase()) {
@@ -868,15 +954,318 @@ function setValue(e,v) {
     };
 }
 function loadSettings() {
-    var load=function(opt) { var x=qi('option-'+opt); x && ( setValue(x, ls(['opt',opt]) || getValue(x) ) ) };
+    var load=function(opt) { var x=qi('option-'+opt); x && ( setNodeValue(x, ls(['opt',opt]) || getNodeValue(x) ) ) };
     load('nickname');
+    load('language');
     load('fullwidth');
+    load('no-cacach');
+    load('no-soundcloud');
+    load('snow');
     load('theme');
 };
 function saveSettings() {
-    var save=function(opt) { var x=qi('option-'+opt); x && ( ls(['opt',opt], getValue(x)) ) };
+    var save=function(opt) { var x=qi('option-'+opt); x && ( ls(['opt',opt], getNodeValue(x)) ) };
     save('nickname');
+    save('language');
     save('fullwidth');
+    save('no-cacach');
+    save('no-soundcloud');
+    save('snow');
     save('theme');
     applySettings();
+};
+
+// 
+// USER AGENT
+// 
+
+function getBrowser() {
+    var c = window.chrome,
+        nav = window.navigator,
+        vn = nav.vendor,
+        o = nav.userAgent.indexOf("OPR") > -1,
+        e = nav.userAgent.indexOf("Edge") > -1,
+        cios = nav.userAgent.match("CriOS");
+
+    if(cios){ return {chrome: true, ios: true}; /* is Google Chrome on IOS */
+    } else if(c !== null && c !== undefined && vn === "Google Inc." && o == false && e == false) {
+        return {chrome: true, default: true}; /* is Google Chrome */
+    } else { return {}; /* not Google Chrome */ }
+};
+var browser = getBrowser();
+
+// 
+// SNOW
+// 
+
+// Fps Control instead requestAnimationFrame
+// http://stackoverflow.com/a/19773537/3676060
+function FpsCtrl(fps, callback) {
+
+	var	delay = 1000 / fps, time = null, frame = -1, tref;
+
+	function loop(timestamp) {
+		if (time === null) time = timestamp;
+		var seg = Math.floor((timestamp - time) / delay);
+		if (seg > frame) {
+			frame = seg;
+			callback({ time: timestamp, frame: frame })
+		}
+		tref = requestAnimationFrame(loop)
+	}
+
+	this.isPlaying = false;
+	
+	this.frameRate = function(newfps) {
+		if (!arguments.length) return fps;
+		fps = newfps;
+		delay = 1000 / fps;
+		frame = -1;
+		time = null;
+	};
+	
+	this.start = function() {
+		if (!this.isPlaying) {
+			this.isPlaying = true;
+			tref = requestAnimationFrame(loop);
+		}
+	};
+	
+	this.pause = function() {
+		if (this.isPlaying) {
+			cancelAnimationFrame(tref);
+			this.isPlaying = false;
+			time = null;
+			frame = -1;
+		}
+	};
+}
+
+
+var snow_flakes = [],
+    snow_canvas = document.getElementById("snow-canvas"),
+    snow_ctx = snow_canvas && snow_canvas.getContext("2d"),
+    snow_flakeCount = 100,
+    snow_mX = -100,
+    snow_mY = -100,
+    snow_downscale = 2,
+    snow_size = 6, //2,
+    snow_color = '180,220,251',
+    snow_fps = new FpsCtrl(snowGetFps(), snowLoop),
+    snow_ready = false;
+
+function snowInitCanvas(snow_canvas) {
+    snow_canvas.width = window.innerWidth / snow_downscale;
+    snow_canvas.height = window.innerHeight / snow_downscale;
+}
+
+function snowGetFps() {
+    var fps = 60, area = window.innerWidth * window.innerHeight;
+    var d = browser.chrome && browser.default ? 1 : 0.5;
+    
+    if(area > 2400000 * d) fps = 12;
+    else if(area > 1800000 * d) fps = 15;
+    else if(area > 1000000 * d) fps = 30;
+    else if(area > 800000 * d) fps = 44;
+
+    console.log('current fps: ' + fps);
+    return fps;
+}
+
+function snowLoop() {
+    if(!viewer.active) {
+        snow_ctx.clearRect(0, 0, snow_canvas.width, snow_canvas.height);
+
+        for (var i = 0; i < snow_flakeCount; i++) {
+            var flake = snow_flakes[i],
+                x = snow_mX,
+                y = snow_mY,
+                minDist = 150,
+                x2 = flake.x,
+                y2 = flake.y;
+
+            var dist = Math.sqrt((x2 - x) * (x2 - x) + (y2 - y) * (y2 - y)),
+                dx = x2 - x,
+                dy = y2 - y;
+
+            if (dist < minDist) {
+                var force = minDist / (dist * dist),
+                    xcomp = (x - x2) / dist,
+                    ycomp = (y - y2) / dist,
+                    deltaV = force / 2;
+
+                flake.velX -= deltaV * xcomp;
+                flake.velY -= deltaV * ycomp;
+
+            } else {
+                flake.velX *= .98;
+                if (flake.velY <= flake.speed) {
+                    flake.velY = flake.speed
+                }
+                flake.velX += Math.cos(flake.step += .05) * flake.stepSize;
+            }
+            
+            flake.y += flake.velY;
+            flake.x += flake.velX;
+
+            if (flake.y >= snow_canvas.height || flake.y <= 0) {
+                snowReset(flake);
+            }
+
+            if (flake.x >= snow_canvas.width || flake.x <= 0) {
+                snowReset(flake);
+            }
+            
+            flake.rotation += (2 * Math.PI / 180);
+
+            snowFlake(snow_ctx,
+                flake.x,
+                flake.y,
+                flake.size,
+                color = 'rgba(' + snow_color + ',' + flake.opacity + ")",
+                flake.type,
+                flake.rotation,
+                flake.rotation_direction);
+            
+        }
+    }
+    // requestAnimationFrame(snow);
+};
+
+function snowFlake(ctx,x,y,size,color,type,rotation,derection) {
+    
+    type = type > 0.6 ? 1 : (type > 0.4 ? 2 : (type > 0.2 ? 3 : 4));
+    
+    switch(type) {
+        case 1:
+        case 2:
+        case 3:
+            // https://jsfiddle.net/okkpbgh1/1/
+
+            size *= 2;
+            var c = {x:x, y:y}, fx, ff, f = rotation*derection;
+            fx = type === 1 ? 0.7 : type === 2 ? 0.5 : 0.3;
+
+            var line = function(c, x,y, fx) {
+        		x = c.x + (size / 2 * Math.sin(f+fx));
+                y = c.y + (size / 2 * Math.cos(f+fx));
+                ctx.lineTo(x, y);
+                return {x:x, y:y};
+            };
+
+            var FF = function(step) { return (Math.PI / 2) * step; };
+
+            ctx.beginPath();
+
+            for(var i = 0; i < 4; i++) {
+                var ff = FF(i);
+                ctx.moveTo(x,y);
+                line(c, x*fx,y*fx, ff);
+                line(c, x,   y,  ff-fx);
+            }
+
+            ctx.strokeStyle = color;
+            ctx.stroke();
+            break;
+        default:
+            size /= 2;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+    }
+};
+
+function snowReset(flake) {
+    flake.x = Math.floor(Math.random() * snow_canvas.width);
+    flake.y = 0;
+    flake.size = (Math.random() * snow_size);
+    flake.speed = (Math.random() * 1) + 0.5;
+    flake.velY = flake.speed;
+    flake.velX = 0;
+    flake.opacity = (Math.random() * 0.5) + 0.3;
+    flake.type = Math.random();
+    flake.rotation = 0;
+    flake.rotation_direction = Math.random() > 0.5 ? 1 : -1;
+}
+
+function initSnow() {
+    document.addEventListener("mousemove", function(e) {
+        snow_mX = e.clientX / snow_downscale;
+        snow_mY = e.clientY / snow_downscale;
+    });
+
+    snowInitCanvas(snow_canvas);
+    window.addEventListener('resize', function(event){
+        snowInitCanvas(snow_canvas);
+        snow_fps.frameRate(snowGetFps());
+    });
+
+    for (var i = 0; i < snow_flakeCount; i++) {
+        var x = Math.floor(Math.random() * snow_canvas.width),
+            y = Math.floor(Math.random() * snow_canvas.height),
+            size = (Math.random() * snow_size),
+            speed = (Math.random() * 1) + 0.5,
+            opacity = (Math.random() * 0.5) + 0.3;
+
+        snow_flakes.push({
+            speed: speed,
+            velY: speed,
+            velX: 0,
+            x: x,
+            y: y,
+            size: size,
+            stepSize: (Math.random()) / 30,
+            step: 0,
+            angle: 180,
+            opacity: opacity
+        });
+    }
+    snow_ready = true;
+    snow_fps.start();
+};
+
+
+function snowPause() {
+    if(ls(['opt','snow']) && typeof snow_ready !== 'undefined' && snow_ready) {
+        snow_fps.pause();
+    }
+};
+
+function snowStart() {
+    if(ls(['opt','snow']) && typeof snow_ready !== 'undefined' && snow_ready) {
+        snow_fps.start();
+    }
+};
+
+function snow() {
+    if(!snow_canvas) return;
+    
+    if(typeof snow_ready !== 'undefined' && snow_ready) {
+        if(ls(['opt','snow'])) {
+            snow_fps.start();
+            document.body.classList.add('snow');
+        } else {
+            snow_fps.pause();
+            document.body.classList.remove('snow');
+        }
+    } else {
+        if(ls(['opt','snow'])) {
+            document.body.classList.add('snow');
+            initSnow();
+        }
+    };
+};
+
+snow();
+
+function keyboardInputHelper(selector) {
+    debugger
+    var x=qs(selector);
+    var p=function(e){ return e.previousSibling };
+    var ael=function(e){ if(e.tagName === 'INPUT') {
+        e.addEventListener('keyup',function(ev){ ev.which === 13 && x.click() }); return true;
+    }};
+    x && p(x) && ael(p(x)) && p(p(x)) && ael(p(p(x)));
 };

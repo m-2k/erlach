@@ -4,73 +4,103 @@
 
 -include("erlach.hrl").
 
+message(Type, Elements, Delay) ->
+    wf:wire(["message('",wf:jse(nitro:render(Elements)),"','",wf:to_binary(Type),"',",wf:to_binary(Delay),");"]).
+    
+highlight(Type) ->
+    wf:wire(["highlight('",wf:to_binary(Type),"');"]).
+
+enc(D,Limit) when is_integer(Limit) ->
+    End=#span{class=moar,body= <<"…"/utf8>>},
+    [enc(erlach_utils:cut(D,Limit,"")),End];
+enc(D,_) -> enc(D).
+
 enc(D) ->
     X=wf:html_encode(D),
     re:replace(X,<<"\\\\">>,<<"\\&#92;">>, [global,{return,binary}]). % \\& for 're' syntax
 
 html(#post{message=Raw},#hes{}=Hes,#st{}=S) ->
-    
-    Raw2=re:replace(Raw,<<"\\n{3,}">>,<<"\n\n">>, [global,{return,binary}]),
-    Message=case spa_utils:option(limit,Hes) of
-        Lim when is_integer(Lim) -> erlach_utils:cut(Raw2,Lim);
-        _ -> Raw2
-    end,
-    
-    FunHookups=fun(capture,[C]) ->
-            case kvs:get(post,erlach_qs:urn_to_id(C)) of
-                {ok,#post{}=P} -> {form,erlach_utils:link(#a{class= <<"l related-link">>},P,S)};
-                _ -> {text,[?RPL,C]}
+    Message=re:replace(Raw,<<"\\n{3,}">>,<<"\n\n">>, [global,{return,binary}]),
+
+    FunHookups=fun(capture,[T]) ->
+            case kvs:get(post,erlach_qs:urn_to_id(T)) of
+                {ok,#post{}=P} -> {form,[?RPL,T],fun(_) -> erlach_utils:link(#a{class= <<"l related-link">>},P,S) end};
+                _ -> {text,[?RPL,T]}
             end;
         (text,T) -> {text,T}
     end,
-    
     FunBoards=fun(capture,[Uri]) ->
             case kvs:index(board,urn,Uri) of
-                [#board{}=B] -> {form,erlach_utils:board_link(#a{class= <<"l related-link">>},B,S)};
+                [#board{}=B] -> {form,[?RPL,Uri],fun(_) -> erlach_utils:board_link(#a{class= <<"l related-link">>},B,S) end};
                 _ -> {text,[?RPL,Uri]}
             end;
         (text,T) -> {text,T}
     end,
-    
-    FunSpoiler=fun(capture,SpoilerList) -> {form,#span{class=spoiler,body=enc(SpoilerList)}}; (text,T) -> {text,T} end,
-    FunBold=fun(capture,Data) -> {form,#span{class=strong,body=enc(Data)}}; (text,T) -> {text,T} end,
-    FunItalic=fun(capture,Data) -> {form,#span{class=italic,body=enc(Data)}}; (text,T) -> {text,T} end,
-    FunStrikeOut=fun(capture,Data) -> {form,#span{class=strikeout,body=enc(Data)}}; (text,T) -> {text,T} end,
-    FunCitate=fun(capture,Data) -> {form,#span{class=citate,body=enc(Data)}}; (text,T) -> {text,T} end,
+    FunSpoiler=fun(capture,T) -> {form,T,fun(LL) -> #span{class=spoiler,body=enc(T,LL)} end}; (text,T) -> {text,T} end,
+    FunBold=fun(capture,T) -> {form,T,fun(LL) -> #span{class=strong,body=enc(T,LL)} end}; (text,T) -> {text,T} end,
+    FunItalic=fun(capture,T) -> {form,T,fun(LL) -> #span{class=italic,body=enc(T,LL)} end}; (text,T) -> {text,T} end,
+    FunStrikeOut=fun(capture,T) -> {form,T, fun(LL) -> #span{class=strikeout,body=enc(T,LL)} end}; (text,T) -> {text,T} end,
+    FunCitate=fun(capture,T) -> {form,T,fun(LL) -> #span{class=citate,body=enc(T,LL)} end}; (text,T) -> {text,T} end,
     CutUri=fun(Uri) -> erlach_utils:cut(Uri,wf:config(erlach,uri_max_length,50)) end,
-    
     FunWebUrls=fun(capture,[Scheme,Uri]) ->
             Sh=case Scheme of <<>> -> <<"http://">>; _ -> Scheme end,
-            {form,#link{target="_blank",class=l,body=enc(CutUri(Uri)),href=enc([Sh,Uri])}};
+            T=CutUri(Uri),
+            {form,T,fun(LL) -> #link{target="_blank",class=l,body=enc(T,LL),href=enc([Sh,Uri])} end};
         (text,T) -> {text,T}
     end,
-    
-    Stage=fun(Tag,Data,Fun) -> lists:flatten([
-        case Type of text -> parse_replace(Text,Tag,Fun); form -> {form,Text} end || {Type,Text} <- Data ]) end,
-    
-    Markup=fun(Stage0) ->
-        Stage1=Stage(post_link,Stage0,FunHookups),
-        Stage2=Stage(board_link,Stage1,FunBoards),
-        
-        Stage3=Stage(citate,Stage2,FunCitate),
-        Stage4=Stage(spoiler,Stage3,FunSpoiler),
-        Stage5=Stage(bold,Stage4,FunBold),
-        
-        % Stage5a=Stage(ym_url_replace,Stage5,FunYandexMusicUrls),
-        Stage6=Stage(url_replace,Stage5,FunWebUrls),
-         
-        Stage7=Stage(italic,Stage6,FunItalic),
-        Stage8=Stage(strikeout,Stage7,FunStrikeOut),
-        
-        [ case X of {form,F} -> F; {text,T} -> enc(T); Raw -> enc(Raw) end || X <- Stage8 ]
-    end,
-    
-    Markup([{text,Message}]).
 
+    Stage1=parse_stage(post_link,[{text,Message}],FunHookups),
+    Stage2=parse_stage(board_link,Stage1,FunBoards),
+    Stage3=parse_stage(citate,Stage2,FunCitate),
+    Stage4=parse_stage(spoiler,Stage3,FunSpoiler),
+    Stage5=parse_stage(bold,Stage4,FunBold),
+    Stage6=parse_stage(url_replace,Stage5,FunWebUrls),
+    Stage7=parse_stage(italic,Stage6,FunItalic),
+    Stage8=parse_stage(strikeout,Stage7,FunStrikeOut),
+    wf:info(?M,"~p~n~n~n~n",[Stage8]),
+    TotalLimit=spa:option(limit,Hes),
+    TextCutMin=wf:config(erlach,text_cut_min_char_count,5),
+
+    element(1,lists:foldl(fun(X,{Acc,Count}) ->
+        Text=case X of {form,T,_} -> T; {text,T} -> T; _Raw -> X end,
+        Length=erlach_utils:char_length(Text),
+        LocalLimit=case is_integer(TotalLimit) of
+            true when TotalLimit - Count >= Length -> false;
+            true -> TotalLimit - Count;
+            false -> false
+        end,
+        Generate=case is_integer(LocalLimit) of
+            true when LocalLimit >= TextCutMin -> true;
+            true -> false;
+            false -> true
+        end,
+        X2=case Generate of
+            true -> Acc++[ case X of {form,_,Eval} -> Eval(LocalLimit); _ -> enc(Text,LocalLimit) end ];
+            false -> Acc
+        end,
+        {X2, Length + Count}
+    end,{[],0},Stage8)).
+
+
+parse_stage(Tag,Data,Fun) ->
+    lists:foldr(fun({text,Text},Acc) -> parse_replace(Text,Tag,Fun) ++ Acc;
+                   ({form,Text,Eval},Acc) -> [ {form,Text,Eval} | Acc ]
+        end,[],Data).
 
 parse_replace(Data,RegexTag,Fun) ->
-    lists:foldr(fun([T|C],A) -> case C of [] -> [Fun(text,T)|A]; _ -> [Fun(text,T),Fun(capture,C)|A] end end,
-        [],re:split(Data,re_compiled(RegexTag),[group,{return,binary}])). % TODO: re()
+    lists:foldr(fun([T|C],A) ->
+        case C of
+            [] -> [Fun(text,T)|A];
+            _ -> [Fun(text,T),Fun(capture,C)|A]
+        end
+    end,[],re:split(Data,re_compiled(RegexTag),[group,{return,binary}])). % TODO: re()
+
+
+image_filter(Topic) ->
+    case re:run(Topic,erlach_markup:re_compiled(thread_filter_bw),[]) of
+        {match,_} -> bw;
+        nomatch -> ?UNDEF
+    end.
 
 
 % Regexp. For output use: rp(erlach_markup:re(links_replace)).
@@ -82,7 +112,7 @@ re(spoiler) -> {ok,Re}=re:compile(<<"(?:(?:\\%\\%(.+?)\\%\\%)|(?:\\[s\\](.+?)\\[
 re(bold) -> {ok,Re}=re:compile(<<"(?:(?:\\*\\*(.+?)\\*\\*)|(?:\\_\\_(.+?)\\_\\_)|(?:\\[b\\](.+?)\\[\\/b\\]))">>,[dotall]),Re;
 re(italic) -> {ok,Re}=re:compile(<<"(?:(?:\\*(.+?)\\*)|(?:\\_(.+?)\\_)|(?:\\[i\\](.+?)\\[\\/i\\]))">>,[dotall]),Re;
 re(strikeout) -> {ok,Re}=re:compile(<<"(\\p{Xwd}+)\\^W">>,[unicode]),Re;
-re(citate) -> {ok,Re}=re:compile(<<"(\\>.+\\S)">>),Re;
+re(citate) -> {ok,Re}=re:compile(<<"(?<=\\s|^)(\\>.+)(?=\\s|$)">>),Re; % http://stackoverflow.com/a/6713378/3676060
 % re(paragraph) -> {ok,Re}=re:compile(<<"(\\n\\n)">>),Re;
 
 % https://gist.github.com/m-2k/f176e8eea40f2decc8ed571b0ab8411f
@@ -93,7 +123,10 @@ re(url_replace) ->
                          "(?:\\.(?:[a-z0-9]-*)*[a-z0-9]+)*",  % domain name
                          "(?:\\.(?:[a-z]{2,}))",              % TLD identifier
                          "(?:\\.)?",                          % TLD may end with dot
-                         ")(?:[/?#][\\S_]*)?)">>,[unicode]),Re.  % resource path
+                         ")(?:[/?#][\\S_]*)?)">>,[unicode]),Re;  % resource path
+
+re(thread_filter_bw) ->
+    {ok,Re}=re:compile(<<"\\[bw\\]"/utf8>>,[unicode,caseless]), Re.
 
 re_compiled(post_link) ->
     {re_pattern,1,0,0,
@@ -122,4 +155,5 @@ re_compiled(url_replace) ->
               0,5,114,0,176,140,125,0,38,106,0,0,0,0,8,128,0,128,0,0,
               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,85,8,114,0,
               38,114,0,226,114,1,32,0>>};
+
 re_compiled(Tag) -> wf:info(?M,"Using non-compiled regexp",[]), re(Tag).

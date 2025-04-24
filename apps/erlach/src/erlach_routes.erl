@@ -23,10 +23,12 @@ route(#query{q1=Q1,q2=Q2,q3=Q3,q4=Q4}=Q) ->
     end,
     R#route{query=Q}.
 
-route(?UNDEF,         ?UNDEF, _) -> #route{module=?SPA,render=erlach_main};
-route(<<"about">>=L,  ?UNDEF, _) -> #route{module=?SPA,render=erlach_about,             level=L};
-route(<<"stream">>=L, Board,  _) -> #route{module=?SPA,render=erlach_stream,board=Board,level=L};
-route(Board,          ?UNDEF, _) -> #route{module=?SPA,render=erlach_board, board=Board};
-route(Board,          Thread, Post) -> #route{module=?SPA,render=erlach_thread,board=Board,thread=Thread,post=Post}.
+route(?UNDEF,       ?UNDEF, _) -> #route{module=?SPA,render=erlach_main};
+route(<<"signin">>, Level,  _) -> #route{module=?SPA,render=erlach_signin,level=Level};
+route(<<"join">>,   Level,  _) -> #route{module=?SPA,render=erlach_join,level=Level};
+route(<<"about">>,  ?UNDEF, _) -> #route{module=?SPA,render=erlach_about};
+route(<<"stream">>, Board,  _) -> #route{module=?SPA,render=erlach_stream,level=Board,board=Board};
+route(Board,        ?UNDEF, _) -> #route{module=?SPA,render=erlach_board, board=Board};
+route(Board,     Thread, Post) -> #route{module=?SPA,render=erlach_thread,board=Board,thread=Thread,post=Post}.
 
 services(Board,Thread,Post)  -> #route{module=?SPA,render=erlach_services,board=Board,thread=Thread,post=Post}.

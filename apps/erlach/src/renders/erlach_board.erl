@@ -5,14 +5,14 @@
 -include("erlach.hrl").
 
 title(#st{board=#board{name=Name}}) -> <<Name/binary," – Erlach"/utf8>>.
-urn() -> ?UNDEF.
+urn() -> ?URN_PAGE_DYNAMIC.
 
 init(#route{board=Burn}=Route) ->
     wf:info(?M,"init",[]),
     case kvs:index(board,urn,Burn) of
         [#board{id=Bid}=B] ->
             wf:reg({board,Bid}),
-            {ok,#st{route=Route,action=view,board=B}};
+            {ok,#st{user=eauth_user:get(),route=Route,action=view,board=B}};
         _ -> {redirect,erlach_qs:mp(main)}
     end.
 finalize(#st{}) -> ok.
@@ -37,7 +37,7 @@ render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
                 [[render(T,#hes{board=B},S),render(last,#hes{board=B,thread=T},S)] | Acc]
             end,[],post,Top,Count,#iterator.prev,#kvs{mod=?DBA});
         _ -> []
-    end,    
+    end,
     #panel{id=Panel,body=[
         #panel{class= <<"content-title">>,body=Name},
         #span{class= <<"remark">>,body=Desc},
@@ -48,21 +48,33 @@ render(controls=Panel,#st{board=#board{feed_id={board,PartyId}}=B}=S) ->
         actions="ls(['opt','catalog']) && qi('content').classList.add('catalog');",
         body=[
             case guard_addition(S) of
-                true -> #button{class=black,body= <<"Создать тред"/utf8>>,postback=#create{target=thread}};
+                true ->
+                    #button{class=black,body=[
+                        #span{class=ru,body= <<"Создать тред"/utf8>>},
+                        #span{class=en,body= <<"Create thread"/utf8>>} ],
+                        postback=#create{target=thread}};
                 false -> []
             end,
-            #button{class=[black,<<"action-catalog">>],body= <<"Каталог"/utf8>>,
-                %postback=#view{target=catalog,option=show}},
+            #button{class=[black,<<"action-catalog">>],
+                body=[#span{class=ru,body= <<"Каталог"/utf8>>},
+                    #span{class=en,body= <<"Catalog"/utf8>>}],
+                title= <<"Thread-view mode selector"/utf8>>,
                 actions=#bind{target={qs,["[id='",Panel,"'] button.action-catalog"]},
                     type=click,postback="ls(['opt','catalog'],true);qi('content').classList.add('catalog');"}
                 },
-            #button{class=[black,<<"action-catalog">>,checked],body= <<"Каталог"/utf8>>,
+            #button{class=[black,<<"action-catalog">>,checked],
+                body=[#span{class=ru,body= <<"Каталог"/utf8>>},
+                    #span{class=en,body= <<"Catalog"/utf8>>}],
+                title= <<"Thread-view mode selector"/utf8>>,
                 actions=#bind{target={qs,["[id='",Panel,"'] button.action-catalog.checked"]},
                     type=click,postback="lsrem(['opt','catalog']);qi('content').classList.remove('catalog');"}
                 },
-            #a{class=[b,sea],body= <<"Стрим картинок"/utf8>>,
+            #a{class=[b,sea],body=[
+                    #span{class=ru,body= <<"Стрим картинок"/utf8>>},
+                    #span{class=en,body= <<"Image stream"/utf8>>} ],
                 postback=erlach_qs:mp({stream,B}),href=erlach_qs:ml({stream,B})}
             ]}.
+
 render(last,#hes{board=#board{}=B,thread=#post{id=Tid}=T}=Hes,#st{}=S) ->
     LastPostsCount=wf:config(erlach,last_posts_count,3),
     Elements=case kvs:get(feed,{post,Tid}) of
@@ -70,10 +82,14 @@ render(last,#hes{board=#board{}=B,thread=#post{id=Tid}=T}=Hes,#st{}=S) ->
             LastPosts=kvs:entries(F,post,LastPostsCount),
             Info=case C > LastPostsCount of
                 true -> #panel{class=omitted,body=#panel{class= <<"post-content">>,body=[
-                        #panel{class= <<"post-message">>,body=[wf:to_list(C-LastPostsCount),<<" messages omitted">>]}]}};
+                        % #panel{class= <<"post-message">>,body=[wf:to_list(C-LastPostsCount),<<" messages omitted">>]}]}};
+                        #panel{class= <<"post-message">>,body=[
+                            wf:to_list(C-LastPostsCount),
+                            ?TR(<<" ответов пропущено"/utf8>>,<<" replies omitted"/utf8>>)]}]}};
                 false -> []
             end,
-            LastElements=[ render(P,#hes{thread=T,board=B},S) || P <- LastPosts ],
+            Hes2=Hes#hes{thread=T,board=B},
+            LastElements=[ render(P,Hes2,S) || P <- LastPosts ],
             [Info,LastElements];
         _ -> []
     end,
@@ -91,16 +107,17 @@ render({'post-info',#post{id=Tid,type=thread}=T},#hes{board=#board{}=B}=Hes,#st{
     Limit=erlach_thread:limit(wf:coalesce([B,S#st.board])),
     [
         case PostCount of 0 -> []; Pc -> #span{class= <<"b info info-posts-count">>,
-            body=[<<"П: "/utf8>>,wf:to_binary(Pc)]} end,
+            body=[?TR(<<"П: "/utf8>>,<<"P: "/utf8>>),wf:to_binary(Pc)]} end,
         case erlach_stat:count({attachment,thread,Tid}) of
             0 -> [];
-            ImCount -> #span{class= <<"b info info-images-count">>,body=[<<"К: "/utf8>>,wf:to_binary(ImCount)]}
+            ImCount -> #span{class= <<"b info info-images-count">>,body=[?TR(<<"К: "/utf8>>,<<"I: "/utf8>>),wf:to_binary(ImCount)]}
         end
     ];
 render(#post{type=thread,id=Pid,urn=Urn,image=Image}=T,#hes{board=#board{}}=Hes,#st{}=S) ->
     Panel=erlach_utils:post_id(T),
     Hes2=Hes#hes{thread=T,post=T},
-    Limit=wf:config(erlach,board_char_limit,300),
+    Limit=spa:option(limit,Hes,wf:config(erlach,board_thread_char_limit,200)),
+
     #panel{id=Panel,class=[post],
         actions=["render('",Panel,"');"],
         data_fields=[{<<"data-id">>,Urn}],
@@ -119,7 +136,7 @@ render(#post{type=thread,id=Pid,urn=Urn,image=Image}=T,#hes{board=#board{}}=Hes,
 render(#post{type=post,image=Image,urn=Urn,sage=Sage}=P,#hes{board=B,thread=T}=Hes,#st{}=S) ->
     Panel=erlach_utils:post_id(P),
     Hes2=Hes#hes{post=P},
-    Limit=wf:config(erlach,board_char_limit,300),
+    Limit=spa:option(limit,Hes,wf:config(erlach,board_post_char_limit,100)),
     #panel{id=Panel,class=[post,case Sage of true -> sage; _ -> [] end],
         actions=["render('",Panel,"');"],
         data_fields=[{<<"data-id">>,Urn}],
@@ -133,7 +150,7 @@ render(#post{type=post,image=Image,urn=Urn,sage=Sage}=P,#hes{board=B,thread=T}=H
                         erlach_thread:render(message,spa:setoption(limit,Limit,Hes2),S)
                     ]},
                     erlach_thread:render(links,#hes{post=P},S),
-                    #panel{class= <<"hidden-info">>,body= <<"Скрыто"/utf8>>}
+                    #panel{class= <<"hidden-info">>,body=?TR(<<"Скрыто"/utf8>>,<<"Hidden"/utf8>>)}
                 ]}
             ]}
     ]}.

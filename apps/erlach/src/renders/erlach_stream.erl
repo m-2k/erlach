@@ -5,14 +5,14 @@
 -include("erlach.hrl").
 
 title(#st{board=#board{name=Name}}) -> <<"Stream: ",Name/binary," – Erlach"/utf8>>.
-urn() -> ?UNDEF.
+urn() -> <<"stream">>.
 
 init(#route{board=Burn}=Route) ->
     wf:info(?M,"init",[]),
     case kvs:index(board,urn,Burn) of
         [#board{id=Bid}=B] ->
             wf:reg({board,Bid}),
-            {ok,#st{route=Route,action=view,board=B}};
+            {ok,#st{user=eauth_user:get(),route=Route,action=view,board=B}};
         _ -> {redirect,erlach_qs:mp(main)}
     end.
 finalize(#st{}) -> ok.
@@ -66,7 +66,9 @@ render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
     ]};
 render(controls=Panel,#st{board=B}) ->
     #panel{id=Panel,class= <<"center">>,body=[
-        #a{class=[b,black],body= <<"Вернуться к доске"/utf8>>,href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}
+        #a{class=[b,black],body=
+            ?TR(<<"Вернуться к доске"/utf8>>,<<"Back to board"/utf8>>),
+            href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}
         ]}.
 
 render(#attachment{id=Aid}=A,#hes{board=B}=Hes,#st{}=S) ->

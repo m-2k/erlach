@@ -1,11 +1,15 @@
 -module(erlach_spa).
--compile(export_all).
-% -compile({parse_transform, shen}).
 -author('Andy').
+-compile(export_all).
 
 -include("erlach.hrl").
+-include_lib("eauth/include/eauth_user.hrl").
 
 main() -> wf:info(?M,"main",[]).
+
+update_stat() ->
+    wf:send({anal,{user,online,total}},
+        {server,#pubsub{target=anal,action=update,element={user,online,total},from=self()}}).
 
 event(init) ->
     wf:info(?M,"init ~p",[self()]),
@@ -21,23 +25,29 @@ event(init) ->
     case spa:st() of
         #st{services=comments} -> skip;
         _ ->
+            % spa:update(?SPA,header),
             spa:update(?SPA,manage),
             spa:update(?SPA,footer),
             spa:update(?SPA,'erlach-logo')
     end,
+    
+    update_stat(),
     
     wf:info(?M,"init ~p",[ok]);
 event({server,{debug,st}}) -> wf:info(?M,"DEBUG STATE~n~p",[spa:st()]);
 event({server,{debug,mq}}) -> wf:info(?M,"DEBUG MQ~n~p",[[ P || {{pool,_},_}=P <- get()]]);
 event({client,{history,Secret}}) -> navigate((n2o_secret:depickle(Secret))#query{history=true});
 event(terminate) ->
-    terminate_render();
+    terminate_render(),
+    update_stat();
 event(E) -> wf:info(?M,"Proxy event",[]), ?EVENT_ROUTER:proxy(E).
 
 update_all(Render) ->
     case spa:st() of
         #st{services=comments} -> skip;
-        _ -> spa:update(?SPA,breadcrumbs)
+        _ ->
+            spa:update(?SPA,breadcrumbs),
+            spa:update(?SPA,footer)
     end,
     spa:update(Render,content).
 
@@ -111,20 +121,51 @@ render('erlach-logo'=Panel,#st{}) ->
 render(manage=Panel,#st{}=S) ->
     Btn=spa:temp_id(),
     #panel{id=Panel,body=[
-        #a{id=Btn,class=selector,body= <<"Ответы"/utf8>>,
+        #a{id=Btn,class=selector,body=[#span{class=ru,body= <<"Ответы"/utf8>>},
+                #span{class=en,body= <<"Replies"/utf8>>} ],
             postback=#view{render=erlach_main,target=sidebar,option=true,element=Btn}}
     ]};
-render(footer=Panel,#st{access=A}) ->
-    ExtClass= <<"b ext">>,
-    IntClass= <<"b">>,
-    #panel{id=Panel,body=[
-        #panel{class= <<"related-links">>,body=[
-            #link{class=ExtClass, target="_blank", body= <<"Блог"/utf8>>, href= <<"http://blog.erlach.co">>},
-            #link{class=ExtClass, target="_blank", body= <<"LING"/utf8>>, href= <<"http://erlangonxen.org">>},
-            #link{class=ExtClass, target="_blank", body= <<"BPG"/utf8>>, href= <<"http://bellard.org/bpg/">>},
-            #a{class=IntClass, body= <<"Настройки"/utf8>>, source=[x],
-                postback=#view{render=erlach_settings,target=window,option=show}},
-            #a{class=IntClass, body= <<"Инфо"/utf8>>, href=erlach_qs:ml(about), postback=erlach_qs:mp(about)},
-            case A of ?UNDEF -> []; _ -> #a{class=IntClass, body= <<"Выход"/utf8>>, postback=#auth{logout=true}} end
-            ]}
+render(footer=Panel,#st{access=A,user=User}) ->
+    ExtClass=[tooltip], %<<"b ext">>,
+    IntClass=[tooltip], %<<"b">>,
+    Td=td,
+    #panel{id=Panel,class=[fl,cent],body=[
+        #panel{class= <<"related-links fl">>,body=[
+            #a{class=ExtClass, target="_blank", href= <<"http://sttn.co">>, body=[
+                    #span{class=[ru,Td],body= <<"Наша Станция"/utf8>>},
+                    #span{class=[en,Td],body= <<"Radio Station"/utf8>>}
+            ]},
+            #a{class=ExtClass, target="_blank", body=#span{class=Td,body= <<"Erochan VN Engine"/utf8>>}, href= <<"http://vn.erlach.co">>},
+            #a{class=ExtClass, target="_blank", body=#span{class=Td,body= <<"Twitter"/utf8>>}, href= <<"https://twitter.com/erlach_co">>},
+            #a{class=ExtClass, target="_blank", href= <<"http://detector.erlach.co">>, body=[
+                #span{class=[ru,Td],body= <<"Детектор"/utf8>>},
+                #span{class=[en,Td],body= <<"Detector"/utf8>>}
+            ]},
+            #a{class=ExtClass, target="_blank", href= <<"http://blog.erlach.co">>, body=[
+                    #span{class=[ru,Td],body= <<"Блог"/utf8>>},
+                    #span{class=[en,Td],body= <<"Blog"/utf8>>}
+            ]},
+            #a{class=ExtClass, target="_blank", body=#span{class=Td,body= <<"LING"/utf8>>}, href= <<"http://erlangonxen.org">>},
+            #a{class=ExtClass, target="_blank", body=#span{class=Td,body= <<"BPG"/utf8>>}, href= <<"http://bellard.org/bpg/">>},
+            #a{class=[IntClass,<<"bg-im-sett">>], postback=#view{render=erlach_settings,target=window,option=show}, body=[
+                    #span{class=[ru,td],body= <<"Настройки"/utf8>>},
+                    #span{class=[en,td],body= <<"Settings"/utf8>>}
+            ]},
+            #a{class=[IntClass,left], href=erlach_qs:ml(about), postback=erlach_qs:mp(about), body=[
+                    #span{class=[ru,Td],body= <<"Инфо"/utf8>>},
+                    #span{class=[en,Td],body= <<"About"/utf8>>}
+            ]},
+            case {wf:config(erlach,auth),User} of
+                {true,#user{}} ->
+                    #a{class=[IntClass,<<"bg-im-out">>,left], body=[
+                            #span{class=[ru,Td],body= <<"Выход"/utf8>>},
+                            #span{class=[en,Td],body= <<"Logout"/utf8>>} ],
+                        postback=#render_event{render=erlach_signin,target=auth,event=logout}};
+                {true,_} ->
+                    #a{class=[IntClass,<<"bg-im-in">>,left], postback=erlach_qs:mp(signin), body=[
+                        #span{class=[ru,Td],body= <<"Вход"/utf8>>},
+                        #span{class=[en,Td],body= <<"Sign In"/utf8>>} ]};
+                _ -> []
+            end
+        ]}
     ]}.

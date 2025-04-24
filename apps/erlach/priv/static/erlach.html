@@ -1,22 +1,35 @@
 <html>
     <head>
         <link href='/static/erlach.css' type='text/css' rel='stylesheet'>
-        <link href='/static/favicon-512.png' rel='shortcut icon' type="image/png">
+        <link href='/static/favicon-k.png' rel='shortcut icon' type="image/png">
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
         <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=yes">
         <title>Erlach Imageboard</title>
     </head>
-    <body>
+    <body class='en dark'>
         <script>
             function je(e) { return JSON.stringify(e) };
             function jd(e) { return JSON.parse(e) };
-            function ls(k,v) { try { return v !== undefined ? localStorage.setItem(je(k),je(v)) : jd(localStorage.getItem(je(k))) } catch(e) {} };
+            function ls(k,v) { try {
+                if(v !== undefined) { return localStorage.setItem(je(k),je(v)); }
+                else { var x = jd(localStorage.getItem(je(k))); return x === null ? false : x; } 
+            } catch(e) {} };
             function applySettings() {
-                var t = ls(['opt','theme']);
-                t && document.body.classList.add(t);
+                
+                var selector = function(opt,values) {
+                    var lo = ls(['opt',opt]) || values[0];
+                    ls(['opt',opt],lo);
+                    DOMTokenList.prototype.remove.apply(document.body.classList, values);
+                    lo && document.body.classList.add(lo);
+                }
+                
+                selector('theme',['dark','light']);
+                selector('language',['en','ru']);
     
                 var fw = ls(['opt','fullwidth']);
                 fw ? document.body.classList.add('fullwidth') : document.body.classList.remove('fullwidth');
+                
+                typeof snow !== 'undefined' && snow();
             };
             applySettings();
         </script>
@@ -70,8 +83,9 @@
                 <div id='manage'></div>
             </div>
         </header>
+        <div id='snow-area'><canvas id='snow-canvas' resize='true'></canvas></div>
+        <div id='sidebar'></div>
         <div id='main'>
-            <div id='sidebar'></div>
             <div id='content'></div>
         </div>
         <footer id='footer'></footer>
@@ -79,12 +93,19 @@
             <div id='move-up' onclick='scrollToTop();'>⬆</div>
             <div id='move-down' onclick='scrollToBottom();'>⬇</div>
         </div>
+        <div class='face'></div>
         <div class='drag'></div>
         <div id='viewer'>
             <div class='viewer-controls fl cent'>
-                <a id='viewer-download' class='b black' target='_blank' download>Загрузить</a>
-                <a id='viewer-google' class='b black' target='_blank'>Google</a>
-                <a id='viewer-tineye' class='b black' target='_blank'>TinEye</a>
+                <a id='viewer-download' class='b black' target='_blank' download>
+                    <span class='ru'>Скачать</span>
+                    <span class='en'>Download</span>
+                </a>
+                <a id='viewer-google' class='b black' target='_blank' title='images.google.com'>G</a>
+                <a id='viewer-tineye' class='b black' target='_blank' title='tineye.com'>T</a>
+                <a id='viewer-saucenao' class='b black' target='_blank' title='saucenao.com'>S</a>
+                <a id='viewer-iqdb' class='b black' target='_blank' title='iqdb.org'>I</a>
+                <a id='viewer-whatanime' class='b black' target='_blank' title='whatanime.ga'>A</a>
             </div>
             <div class='fl cent monitor'>
                 <div class='image-manage'>

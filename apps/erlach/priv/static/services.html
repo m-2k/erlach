@@ -5,11 +5,14 @@
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
         <title></title>
     </head>
-    <body>
+    <body class='en'>
         <script>
             function je(e) { return JSON.stringify(e) };
             function jd(e) { return JSON.parse(e) };
-            function ls(k,v) { try { return v !== undefined ? localStorage.setItem(je(k),je(v)) : jd(localStorage.getItem(je(k))) } catch(e) {} };
+            function ls(k,v) { try {
+                if(v !== undefined) { return localStorage.setItem(je(k),je(v)); }
+                else { var x = jd(localStorage.getItem(je(k))); return x === null ? false : x; } 
+            } catch(e) {} };
         </script>
         <header id='services-header'>
             <a target="_blank" href='https://erlach.co/about'>

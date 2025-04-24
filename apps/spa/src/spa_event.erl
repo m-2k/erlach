@@ -1,6 +1,5 @@
 -module(spa_event).
 -author('Andy').
-
 -compile(export_all).
 
 -include("spa.hrl").
@@ -125,19 +124,17 @@ store(#add{target=Tg,feed=F,forms=Fm}) ->
     Init=[{id,kvs:next_id(atom_to_list(Tg),1)},{created,erlang:timestamp()},{feed_id,F},{deleted,true}],
     E=?RM:new(Tg,Init),
     E2=spa:apply_forms(spa:extract_forms(Fm),E),
-    {ok,E3}=spa_feeds:call(append,E2),
+    {ok,E3}=kvs_feeds:append(E2),
     E3;
 store(#put{target=Tg,id=Id,forms=Fm}) ->
     {ok,E}=kvs:get(Tg,Id),
     Efm=spa:extract_forms(Fm),
-    {ok,E3}=spa_feeds:call(update,E,fun(E2) -> {ok,spa:apply_forms(Efm,E2)} end),
+    {ok,E3}=kvs_feeds:update(E,fun(E2) -> {ok,spa:apply_forms(Efm,E2)} end),
     E3;
 store(#delete{target=Tg,id=Id,value=Boolean})->
     {ok,E}=kvs:get(Tg,Id),
-    {ok,E3}=spa_feeds:call(update,E,fun(E2) -> {ok,?RM:set(#db_element.deleted,E2,Boolean)} end),
+    {ok,E3}=kvs_feeds:update(E,fun(E2) -> {ok,?RM:set(#db_element.deleted,E2,Boolean)} end),
     E3.
-
-
 
 publish(#pubsub{data=E}=M) ->
     Chan=?RM:channel(E),

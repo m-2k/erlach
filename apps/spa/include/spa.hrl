@@ -9,9 +9,6 @@
 
 -define(RM,spa_record_manager).
 
--include_lib("nitro/include/nitro.hrl").
--record(a,            {?ELEMENT_BASE(element_a),  href, hreflang, media, rel, target, type, url="javascript:void(0);", download, name}).
-
 -ifndef(RDR_PUBSUB_RENDER).
 -define(RDR_PUBSUB_RENDER, ?UNDEF). % page_id
 -endif.

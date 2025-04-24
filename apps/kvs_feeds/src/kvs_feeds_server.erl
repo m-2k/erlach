@@ -1,24 +1,16 @@
--module(spa_feeds).
+-module(kvs_feeds_server).
 -author('Andy').
 -compile(export_all).
--include("spa.hrl").
--include("spa_db.hrl").
+
+-include("kvs_feeds.hrl").
 -include_lib("n2o/include/wf.hrl").
 -include_lib("kvs/include/config.hrl").
 -include_lib("kvs/include/feed.hrl").
 
--define(SUPERVISER,spa). % genserver application name
+-define(GROUP,kvs_feeds). % genserver application name
 -define(CLASS,feed_server).  % ets caching key prefix
 
-%%% Usage
-%
-% {ok,_}=spa_feeds:call(append,Element)
-% {ok,_}=spa_feeds:call(update,Element,FunUpdate), FunUpdate=fun(#post{links=Links}=P) -> {ok,P#post{links=lists:usort([Pid | Links])}} end,
-% {ok,_}=spa_feeds:call(append,Element)
-%        spa_feeds:call(delete,Element)
-% 
-
-reply(R,S) -> {reply,R,S,wf:config(?SPA_CONFIG_NAME,feed_server_process_timeout,10*60*1000)}.
+reply(R,S) -> {reply,R,S,?CONFIG(feed_timeout,10*60*1000)}.
 feed_channel(R) ->
     case element(2,R) of
         Id when is_integer(Id) -> {element(#iterator.container,R),element(#iterator.feed_id,R)};
@@ -26,7 +18,7 @@ feed_channel(R) ->
     end.
 
 log(Action,#handler{name=FeedChannel},Pid) -> log(Action,FeedChannel,Pid);
-log(Action,Data,Pid) -> wf:info(?M,"Feed server ~p ~p ~p",[Pid,Action,Data]).
+log(Action,Data,Pid) -> ?LOG(" ~p ~p ~p",[Pid,Action,Data]).
 
 call(Cmd,Record) -> call(Cmd,Record,?UNDEF).
 call(Cmd,Record,Fun) ->
@@ -35,11 +27,11 @@ call(Cmd,Record,Fun) ->
     n2o_async:send(Pid,case Fun of F when is_function(F) -> {Cmd,Record,F}; _ -> {Cmd,Record} end).
     
 ensure_start(FeedChannel) ->
-    wf:info(?M,"ensure start ~p",[FeedChannel]),
+    log(ensure_start,FeedChannel,self()),
     case n2o_async:pid({?CLASS,FeedChannel}) of Pid when is_pid(Pid) -> Pid; _ -> start(FeedChannel) end.
 
 start(FeedChannel) ->
-    H=#handler{module=?M,group=?SUPERVISER,class=?CLASS,name=FeedChannel,state=[]},
+    H=#handler{module=?M,group=?GROUP,class=?CLASS,name=FeedChannel,state=[]},
     {Pid,FeedChannel}=n2o_async:start(H),
     log(start,H,Pid),
     Pid.
@@ -52,7 +44,7 @@ proc(init,H) ->
     log(init,H,self()),
     {ok,H};
 proc(timeout,#handler{}=H) ->
-    case wf:config(?SPA_CONFIG_NAME,feed_server_process_timeout_action,hibernate) of
+    case ?CONFIG(feed_timeout_action,hibernate) of
         stop -> log(stop,H,self()), {stop,normal,H};
         hibernate -> log(hibernate,H,self()), {noreply,H,hibernate}
     end;
@@ -75,17 +67,15 @@ exec({eval,R,Fun}) ->
     end;
 exec({relink,R}) ->
     log(relink,R,self()),
-    {ok,F}=kvs:get(element(#iterator.container,R),element(#iterator.feed_id,R)),
-    kvs:relink(F,R,#kvs{mod=?DBA}),
-    kvs:link(R);
+    {ok,R2}=kvs:unlink(R),
+    kvs:link(R2);
 exec({delete,R}) ->
     log(delete,R,self()),
     kvs:remove(element(1,R),element(2,R));
-exec({purge,R,PurgeList}) -> % with feed
+exec({purge,R,PurgeFun}) -> % with feed
     log(purge,R,self()),
     Tab=element(1,R),
     Id=element(2,R),
-    Container=element(#iterator.container,R),
     kvs:remove(Tab,Id),
     
     PurgeFeed=fun({PC,PT,Fun}) ->
@@ -98,6 +88,6 @@ exec({purge,R,PurgeList}) -> % with feed
             _ -> skip
         end
     end,
-    lists:map(PurgeFeed,PurgeList());
+    lists:map(PurgeFeed,PurgeFun());
     
 exec(C) -> log(unknown,C,self()), skip.

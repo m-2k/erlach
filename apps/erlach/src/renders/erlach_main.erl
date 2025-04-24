@@ -1,15 +1,17 @@
 -module(erlach_main).
--compile(export_all).
 -author('Andy').
+-compile(export_all).
 
 -include("erlach.hrl").
 
+-define(HES_PCL(Hes),spa:setoption(limit,99999,Hes)).
+
 title(#st{}) -> wf:to_binary(wf:config(erlach,title,"Erlach")).
-urn() -> ?UNDEF.
+urn() -> ?URN_PAGE_MAIN.
 
 init(#route{}=Route) ->
     wf:info(?M,"init",[]),
-    {ok,#st{route=Route,action=view}}.
+    {ok,#st{user=eauth_user:get(),route=Route,action=view}}.
 finalize(#st{}) -> ok.
 terminate() -> wf:info(?M,"TERMINATE ~p",[self()]).
 
@@ -42,40 +44,52 @@ board_list() ->
 
 last_updates() ->
     S=spa:st(),
-    Elements=[ begin
-        {ok,#post{board=Bid}=T}=kvs:get(post,Tid),
-        {ok,#board{feed_id={board,PartyId}}=B}=kvs:get(board,Bid),
-        {ok,B}=kvs:get(board,Bid),
-        case kvs:get(party,PartyId) of
-            {ok,#party{hidden=false}} -> [erlach_board:render(T,#hes{board=B},S),erlach_board:render(last,#hes{board=B,thread=T},S)];
-            _ -> []
-        end
-    end || Tid <- last_threads() ],
-    
+    Count=wf:config(erlach,main_last_count,7),
+    Elements=lists:foldl(fun(Tid,Acc) when length(Acc) < Count ->
+        case kvs:get(post,Tid) of
+            {ok,#post{board=Bid}=T} ->
+                {ok,#board{feed_id={board,PartyId}}=B}=kvs:get(board,Bid),
+                {ok,B}=kvs:get(board,Bid),
+                case kvs:get(party,PartyId) of
+                    {ok,#party{hidden=false}} ->
+                        [[
+                            erlach_board:render(T,?HES_PCL(#hes{board=B}),S),
+                            erlach_board:render(last,?HES_PCL(#hes{board=B,thread=T}),S)
+                        ]|Acc];
+                    _ -> Acc
+                end;
+            _ -> Acc
+        end;
+        (_,Acc) -> Acc
+    end,[],last_threads()),
+
     #panel{class= <<"last-updates">>,body=[
-        #panel{class=remark,body= <<"Самое свежее, ням"/utf8>>},
-        #panel{id=threads,body=Elements}
+        #panel{class=remark,body=[#span{class=ru,body= <<"Самое свежее, ням"/utf8>>},
+                #span{class=en,body= <<"Latest news, yum"/utf8>>} ] },
+        #panel{id=threads,body=lists:reverse(Elements)}
     ]}.
 
 last_threads() ->
-    Last=case kvs:get(statistic,{threads,recent_activity}) of
+    case kvs:get(statistic,{threads,recent_activity}) of
         {ok,#statistic{value=List}} -> List;
         _ ->
             List=calculate_last_threads(wf:config(erlach,threads_recent_activity_count,100)),
             kvs:put(#statistic{id={threads,recent_activity},value=List}),
             List
-    end,
-    {First,_}=spa_utils:ensure_split(wf:config(erlach,main_last_count,7),Last),
-    First.
+    end.
 calculate_last_threads(Count) ->
     All=[ case Type of thread -> {Id,C}; post -> {Parent,C} end || #post{type=Type,id=Id,feed_id={_,Parent},created=C} <- kvs:all(post) ],
     Map=lists:foldl(fun({Id,C},A) -> maps:update_with(Id, fun(C0) when C0 > C -> C0; (_) -> C end, C, A) end, #{}, All),
     Sorted=lists:keysort(2,maps:to_list(Map)),
     {LastList,_}=spa_utils:ensure_split(Count,lists:reverse(Sorted)),
     [ Id || {Id,_} <- LastList ].
+    
 
 event(#view{target=sidebar,option=Visibled,element=Btn}=E) ->
     wf:update(Btn,#a{id=Btn,class=case Visibled of true -> [selector,checked]; false -> selector end,
-        body= <<"Ответы"/utf8>>,postback=E#view{option=not Visibled}}),
+        body=[ #span{class=ru,body= <<"Ответы"/utf8>>},
+            #span{class=en,body= <<"Replies"/utf8>>} ],
+        postback=E#view{option=not Visibled}}),
     wf:wire(wf:f("qi('sidebar').dataset.visibled=~s;",[Visibled])); % data-* for safari supports
+
 event(Unknown) -> ?EVENT_ROUTER:unknown(?M,Unknown).

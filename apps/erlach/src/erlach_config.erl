@@ -54,7 +54,16 @@ log_modules() ->
         erlach_stat,
         erlach_filter,
         erlach_feeds,
-        erlach_settings
+        erlach_markup,
+        erlach_settings,
+        erlach_signin,
+        erlach_join,
+        
+        eauth,
+        eauth_event,
+        eauth_mail,
+        eauth_user,
+        eauth_utils
         ]).
 info() ->  spawn(fun()-> wf:info(hd(log_modules()),"~p",[mnesia:info()]) end).
 

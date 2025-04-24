@@ -36,7 +36,7 @@ request(User,Passwd) ->
         nitro:pickle(Event),<<"'),[])));">> ]).
 
 event(#auth{logout=true}=A) ->
-    wf:warning(?M,"Logout",[]),
+    wf:info(?M,"Logout",[]),
     clear_user(),
     case spa:st() of
         #st{route=R}=S -> ?SPA:navigate(R); % refresh page
@@ -54,4 +54,5 @@ event(#auth{user=User,passwd=Passwd}=A) ->
                 _ -> wf:warning(?M,"State not initialized",[])
             end;
         false -> wf:warning(?M,"Auth failed: ~p",[A])
-    end.
+    end;
+event(Unknown) -> ?EVENT_ROUTER:unknown(?M,Unknown).

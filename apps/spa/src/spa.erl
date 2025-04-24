@@ -2,7 +2,6 @@
 -author('Andy').
 -behaviour(application).
 -export([start/2, stop/1, init/1]).
-
 -compile(export_all).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19,7 +18,7 @@ stop(_) -> ok.
 init([]) -> {ok, {{one_for_one,5,10}, []} }.
 
 %%% Option helper for #hes{}
-option(Key,From) -> option(Key,from,false).
+option(Key,From) -> option(Key,From,false).
 
 option(Key,Hes,Default) when ?REC(Hes,hes) -> spa_utils:option(Key,element(#hes.option,Hes),Default);
 option(Key,From,Default) -> spa_utils:option(Key,From,Default).
@@ -72,15 +71,13 @@ rif(_,_) -> [].
 
 temp_id() -> [$(|spa_utils:hex64(binary:encode_unsigned(erlang:unique_integer([positive])))]++[$)].
 temp_id(Count) -> [ temp_id() || _ <- lists:seq(1,Count) ].
-% forms_only(Fields) -> [ {F,temp_id()} || F <- Fields ].
+
 forms(Fields) -> FS=[ {F,temp_id()} || F <- Fields ], {FS,panels(FS)}.
 panels(Forms) -> [ Panel || {_,Panel} <- Forms ].
-
 
 update(E) -> spa_render:update(E).
 update(R,E) -> spa_render:update(R,E).
 update(R,E,H) -> spa_render:update(R,E,H).
-
 
 % scoped container id
 ci(Sc) -> spa_render:si(Sc,?UNDEF).
@@ -133,7 +130,6 @@ rac(K) -> maps:get(K,rac()).
 rac(K,V) -> rac_write(maps:put(K,V,rac())).
 rac_exist(K) -> maps:is_key(K,rac()).
 rac_erase() -> rac_write(#{}).
-
 
 add_class(Target,ClassList) -> jq_apply(Target,"classList.add",ClassList).
 remove_class(Target,ClassList) -> jq_apply(Target,"classList.remove",ClassList).

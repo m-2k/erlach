@@ -17,7 +17,7 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](erlach-R3-RC7-october-2016-white.png)
+![Screenshot](erlach-R3-RC8-febrary-2017-white.png)
 
 
 ## Requirements

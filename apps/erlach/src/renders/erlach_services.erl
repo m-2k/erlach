@@ -5,15 +5,15 @@
 -include("erlach.hrl").
 
 title(#st{thread=#post{}=T}) -> <<(topic(T))/binary," – Erlach Services"/utf8>>.
-urn() -> ?UNDEF.
+urn() -> ?URN_PAGE_DYNAMIC.
 
 init(#route{}=Route) ->
     case erlach_thread:init(Route) of
         {ok,#st{}=S} -> {ok,S#st{services=comments}};
         Redirect -> Redirect
     end.
-finalize(S) ->
-    erlach_thread:finalize(S).
+
+finalize(S) -> erlach_thread:finalize(S).
 terminate() -> erlach_thread:terminate().
 
 topic(#post{urn=Urn,name_escaped=Name}) ->

@@ -5,8 +5,8 @@
 -include("erlach.hrl").
 -include("erlach_image.hrl").
 
-title(#st{thread=#post{}=T}) -> <<(topic(T))/binary," – Erlach"/utf8>>.
-urn() -> ?UNDEF.
+title(#st{thread=#post{}=T}) -> <<(topic(T,false))/binary," – Erlach"/utf8>>.
+urn() -> ?URN_PAGE_DYNAMIC.
 
 init(#route{board=Burn,thread=Turn,post=Purn}=Route) ->
     wf:info(?M,"init ~p ~p ~p",[Burn,Turn,Purn]),
@@ -22,11 +22,12 @@ init(#route{board=Burn,thread=Turn,post=Purn}=Route) ->
                         _ -> ?UNDEF
                     end
             end,
-            {ok,#st{route=Route,action=view,board=B,thread=T,post=P}};
+            {ok,#st{user=eauth_user:get(),route=Route,action=view,board=B,thread=T,post=P}};
         _ -> {redirect,erlach_qs:mp(main)}
     end.
 finalize(#st{thread=#post{id=Tid},route=#route{option=highlight}}) ->
     wf:info(?M,"finalize with option (~p)",[self()]),
+    % scroll_to(Tid);
     [{scroll,Tid},{wait_finalize,true}];
 finalize(#st{post=P}) ->
     wf:info(?M,"finalize (~p)",[self()]),
@@ -44,8 +45,10 @@ terminate() ->
     wf:unreg({thread,Tid}),
     wf:info(?M,"TERMINATE ~p OK",[self()]).
 
-topic(#post{urn=Urn,name_escaped=Name}) ->
-    case spa_utils:strip(Name) of
+topic(#post{}=P) -> topic(P,true).
+topic(#post{urn=Urn,name=Name,name_escaped=Escaped},IsEscaped) ->
+    Topic = case IsEscaped of true -> Escaped; _ -> Name end,
+    case spa_utils:strip(Topic) of
         <<>> -> <<"thread#",Urn/binary>>;
         Text -> Text
     end.
@@ -63,7 +66,6 @@ load_actions(#view{}=View) ->
     E=wf_event:new(View,"lambda",?M,event,"[]",[]),
     [list_to_binary(["{ setTimeout(function() { ",E," },20) }"])];
 load_actions(_) -> "var x=qs('#input .input-controls [disabled]');x&&x.removeAttribute('disabled');finalize();".
-
 
 render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
     
@@ -84,9 +86,17 @@ render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
         direction=next },
     
     {Instant,View2}=erlach_utils:partial(View),
+    
+    FilterAction=case erlach_markup:image_filter(topic(T,false)) of
+        ?UNDEF -> [];
+        Filter -> #wire{actions=[
+            "var x = function(c) { c && c.classList.add('filter','",wf:to_list(Filter),"') };",
+            "x(qi('content')); x(qi('viewer'));"
+        ]}
+    end,
 
     #panel{id=Panel,
-        actions=load_actions(View2),
+        actions=[ FilterAction, load_actions(View2) ],
         body=[
             #panel{class= <<"content-title">>,body=topic(T)},
             render(T,#hes{board=B},S),
@@ -173,6 +183,7 @@ render({'post-manage',#post{id=Id,created=Ts,type=Type}=P},#hes{}=Hes,#st{access
         #panel{class=time,data_fields=[{<<"data-ts">>,UTC}] }, % ,actions=["render_time('",Panel,"');"] }
         #panel{class=pid}
     ]};
+
 render(message,#hes{post=#post{message=Raw,message_escaped=Esc}=P}=Hes,#st{}=S) ->
     erlach_markup:html(P,Hes,S);
 
@@ -190,7 +201,9 @@ render(links,#hes{post=#post{id=Pid,links=Links}},#st{}=S) ->
         end,#span{body= <<", ">>},lists:reverse(Links)),
     case LinkElements of
         [] -> #panel{id=Panel,body=[]}; % for updating
-        _ -> #panel{id=Panel,class= <<"post-answers">>,body=[#span{body= <<"Ответы: "/utf8>>},LinkElements]}
+        _ -> #panel{id=Panel,class= <<"post-answers">>,body=[#span{body=[
+                #span{class=ru,body= <<"Ответы:"/utf8>>},
+                #span{class=en,body= <<"Replies:"/utf8>>} ]},LinkElements]}
     end;
 
 render(#post{type=thread,id=Tid,urn=Urn,links=Links,message_escaped=Message,image=Image}=T,#hes{board=B}=Hes,#st{}=S) ->
@@ -262,7 +275,7 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
         {_,_,SZM,_} when SZM > LIMM -> Warning(<<"Very long message, LOL">>);
         {_,_,0,#rst{image_ftp=?UNDEF}} -> Warning(<<"Nothing publish">>);
         {_,SZT,SZM,Rst} ->
-            #st{board=#board{id=Bid,feed_id={board,Party}}=StateBoard,thread=StateThread}=S=spa:st(),
+            #st{board=#board{id=Bid,feed_id={board,PartyId}}=StateBoard,thread=StateThread}=S=spa:st(),
             Pid=kvs:next_id(post,1),
             Tid=case Target of post -> StateThread#post.id; thread -> Pid end,
             
@@ -287,7 +300,7 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                     end,
                     A=#attachment{id=Aid,
                         feed_id={attachment,Bid},
-                        party=Party,
+                        party=PartyId,
                         board=Bid,
                         thread=Tid,
                         post=case Target of thread -> ?UNDEF; post -> Pid end,
@@ -313,11 +326,11 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                 thread ->
                     #post{type=thread,id=Tid,feed_id={thread,Bid},
                         created=erlang:timestamp(),urn=erlach_qs:id_to_urn(Pid),
-                        party=Party,board=Bid,thread=?UNDEF,
+                        party=PartyId,board=Bid,thread=?UNDEF,
                         name=T,name_escaped=EscapedT,message=M,message_escaped=EscapedM,image=Image};
                 post ->
                     #post{type=post,id=Pid,feed_id={post,Tid},created=erlang:timestamp(),
-                        party=Party,board=Bid,thread=Tid,
+                        party=PartyId,board=Bid,thread=Tid,
                         urn=erlach_qs:id_to_urn(Pid),message=M,message_escaped=EscapedM,sage=IsSage,image=Image}
             end,
             
@@ -406,8 +419,14 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                         position=beforeend})
             end,
             wf:wire(#jq{target=input,property=id,right=erlach_utils:post_id(Post)}),
+            wf:wire("onAddPostSelf();"),
             case Target of
                 thread ->
+                    case {kvs:get(party,PartyId),StateBoard,Addition} of
+                        {{ok,#party{hidden=false}},#board{hidden=false},#post{hidden=false}} ->
+                            wf:wire(["cacachSender('",erlach_qs:ml({thread,StateBoard,Addition}),"','",topic(Addition),"');"]);
+                        _ -> skip
+                    end,
                     wf:send({board,Bid},{server,#pubsub{target=content,action=add,data=Post,from=self()}}),
                     wf:insert_top(threads,erlach_board:render(controls,spa:st())); % only for erlach_board
                 post ->
@@ -488,7 +507,8 @@ event(#view{target=post,option={thread,Tid},element=Container,partial=true,start
 event(#render_event{target=input,event={sage,Boolean,Sage}}) when is_boolean(Boolean) ->
     wf:update(Sage,#button{id=Sage,class=case Boolean of true -> <<"black checked">>; false -> <<"black">> end,
         postback=#render_event{target=input,event={sage,not Boolean,Sage}},
-        body= <<"Сажи"/utf8>>,value=Boolean});
+        body=[ #span{class=ru,body= <<"Сажи"/utf8>>},
+            #span{class=en,body= <<"Sage"/utf8>>} ],value=Boolean});
     
 event(#delete{target=thread,value=Tid}) -> % thread
     wf:info(?M,"Removing thread ~p",[Tid]),
@@ -527,8 +547,7 @@ event(#ftp{sid=Sid,status={event,init},filename=FileName,meta={meta,TempContaine
     convert_abort(),
     wf:wire(["var x=qi('",TempContainer,"'); x && ( x.id='",image_panel_id(FileName),"');"]),
     erlach_utils:rst((erlach_utils:rst())#rst{image_ftp=Ftp#ftp{meta={process,FileName,Width,Height}}}),
-    
-    
+
     %
     % Init convert entry
     %
@@ -559,7 +578,7 @@ event(#ftp{sid=Sid,status={event,stop},filename=FileName,meta={meta,ImageContain
     Key=key(Ftp),
     Group=key_group(),
     erlach_image:run(Key,Group);
-
+    
 event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={error,Reason},from=From}=Evt) ->
     wf:warning(?M,"~p Convert error: ~p",[self(),{Reason,Key}]),
     case self() of
@@ -571,7 +590,6 @@ event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={error,Reas
                 _ -> skip
             end,
             wf:wire(["uploadFileError('",image_panel_id(Key),"');"]),
-            % spa:warning(<<"Upload error, bad image">>);
             ok;
         _ -> skip % TODO: remove image panel
     end;

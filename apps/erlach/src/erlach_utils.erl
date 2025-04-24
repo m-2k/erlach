@@ -1,7 +1,14 @@
 -module(erlach_utils).
 -author('Andy').
 -compile(export_all).
+
 -include("erlach.hrl").
+
+make_bw_thread(Urn) ->
+    {ok,T}=kvs:get(post,erlach_qs:urn_to_id(Urn)),
+    erlach_feeds:update(T,fun(#post{name=N,name_escaped=NE}=T2) ->
+        N2= <<N/binary," [BW]">>,
+        {ok,T2#post{name=N2,name_escaped=wf:to_binary(wf:html_encode(wf:to_list(N2)))}} end).
 
 % Render State
 rst() -> erlang:get(rst).
@@ -86,10 +93,14 @@ fold(Fun,Table,Container,Feed,Acc) ->
         {ok,C} -> kvs:fold(Fun,Acc,Table,element(#container.top,C),element(#container.count,C),#iterator.prev,#kvs{mod=?DBA});
         _ -> Acc
     end.
-    
-cut(Bin,Limit) ->
-    Chars=unicode:characters_to_list(Bin,utf8),
-    case length(Chars) > Limit of
-        true -> <<(unicode:characters_to_binary(lists:sublist(Chars,Limit),utf8))/binary,"…"/utf8>>;
-        false -> Bin
-    end.
+
+utf8_to_list(Any) -> unicode:characters_to_list(list_to_binary([Any]),utf8).
+char_length(Any) -> length(utf8_to_list(Any)).
+
+cut(Any,Limit) -> cut(Any,Limit,<<"…"/utf8>>).
+cut(Any,Limit,End) ->
+    Chars=utf8_to_list(Any),
+    list_to_binary(case length(Chars) > Limit of
+        true -> [unicode:characters_to_binary(lists:sublist(Chars,Limit),utf8),End];
+        false -> [Any]
+    end).

@@ -5,6 +5,16 @@
 % https://gist.github.com/m-2k/758d25266a444515b724
 % apt-get install libjpeg-progs
 
+
+%% %% %% %% %% %% %% %% %% %% [ TESTING ] %% %% %% %% %% %% %% %% %% %%
+%%
+%% Replace lines in ftp.js for slow loading:
+%% 
+%% ftp.send(item,data); // original
+%% setTimeout(function() { ftp.send(item,data) }, 700); // slow mode
+%% 
+%% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %% %%
+
 -include("erlach.hrl").
 -include("erlach_image.hrl").
 
@@ -133,7 +143,7 @@ finally(#entry{id=Key,finally=Fun,destination=DP}=E,#state{entry_map=EM}=S) ->
     S#state{entry_map=EM2}.
 
 error(#entry{id=Key,error=Fun,destination=DP}=E,Error,#state{entry_map=EM}=S) ->
-    wf:info(?M,"(~p) Exec error fun for ~p",[self(),Key]),
+    wf:error(?M,"(~p) Exec error fun for ~p ~p",[self(),Key,Error]),
     {E3,S2}=case case is_function(Fun,1) of true -> Fun(E); false -> false end of
         #entry{}=E2 -> {E2,S#state{entry_map=maps:update(Key,E2,EM)}};
         _ -> {E,clear(E,S)}
@@ -261,9 +271,12 @@ proc(Unknown,H) ->
 image_info_file(FileName) ->
     case file:read_file(FileName) of
         {ok,Data} ->
-            case image_info(Data) of
+            try image_info(Data) of
                 {ok,Info} -> {ok,setelement(#image_info.size,Info,filelib:file_size(FileName))};
                 Error -> Error
+            catch E:R ->
+                wf:error(?M,"image_info/1 EVALUATION ERROR: {~p:~p}",[E,R]),
+                {error,image_unknown_structure}
             end;
         Error -> Error
     end.
@@ -276,12 +289,14 @@ image_info(<<255,216,Data/binary>>) -> % jpeg
     Foreach=fun Foreach(Offset) ->
         case binary:part(Data,Offset,2) of
             <<16#ff,SOFn>> when SOFn =:= 16#c0 orelse SOFn =:= 16#c2 ->
+                wf:info(?M,"SOFn ~p",[SOFn]),
                 <<B:8,H:16/big,W:16/big,Comp:8>> =binary:part(Data,Offset+4,6),
                 C=case Comp of 1 -> 'GreyScaled'; 3 -> 'YcbCr'; 4 -> 'CMYK' end,
                 {ok,#jpeg{bit_depth=B,height=H,width=W,color_space=C}};
             <<16#ff,_>> ->
                 <<L:16/big>> =binary:part(Data,Offset+2,2),
-                Foreach(Offset+L+2)
+                Foreach(Offset+L+2);
+            _ -> {error,corrupt_jpeg_data}
         end
     end,
     Foreach(0);

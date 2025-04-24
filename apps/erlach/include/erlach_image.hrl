@@ -1,5 +1,6 @@
 -define(SUP_CLASS,converter).
 
+
  % port_map: #{#Port<0.46018> => "2vvbdE", … }
  % entry_map: #{"2vvbdE" => {entry,"2vvbdE", … }, … }
 -record(state,{queue = [], entry_map = #{}, port_map = #{}}).

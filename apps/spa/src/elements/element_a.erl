@@ -1,7 +1,8 @@
 -module(element_a).
 -author('Andy').
 -compile(export_all).
--include("spa.hrl").
+
+-include("spa_elements.hrl").
 
 render_element(Record) ->
     Validate=case Record#a.postback of

@@ -12,6 +12,8 @@ urn(Urn) when is_binary(Urn) -> Urn.
 % make link
 ml(main) -> <<"/">>;
 ml(about) -> <<"/about">>;
+ml(signin) -> <<"/signin">>;
+ml(join) -> <<"/join">>;
 ml({stream,B}) -> <<"/stream/",(urn(B))/binary>>;
 ml({board,B}) -> <<"/",(urn(B))/binary>>;
 ml({thread,B,T}) -> <<"/",(urn(B))/binary,"/",(urn(T))/binary>>;
@@ -21,6 +23,10 @@ ml(_) -> <<"/">>.
 % make postback
 mp(main) -> #postback{action=view,query=#query{ }};
 mp(about) -> #postback{action=view,query=#query{q1= <<"about">>}};
+mp(signin) -> #postback{action=view,query=#query{q1= <<"signin">>}};
+mp({signin,L}) -> #postback{action=view,query=#query{q1= <<"signin">>,q2=wf:to_binary(L)}};
+mp(join) -> #postback{action=view,query=#query{q1= <<"join">>}};
+% mp({join,L}) -> #postback{action=view,query=#query{q1= <<"join">>,q2=wf:to_binary(L)}};
 mp({stream,B}) -> #postback{action=view,query=#query{q1= <<"stream">>,q2=urn(B)}};
 mp({board,B}) -> #postback{action=view,query=#query{q1=urn(B)}};
 mp({thread,B,T}) -> #postback{action=view,query=#query{q1=urn(B),q2=urn(T)}};
@@ -29,7 +35,7 @@ mp({post,B,T,P}) -> #postback{action=view,query=#query{q1=urn(B),q2=urn(T),q3=ur
 up_state(X) -> (mp(X))#postback{route_option=state_update_only}.
 
 is_in_thread_postback(#postback{query=#query{q1= <<"stream">>}}) -> false;
-is_in_thread_postback(#postback{query=#query{q1= ?URI_SERVICES,q3=Q3}}) -> is_in_thread_postback(#postback{query=#query{q2=Q3}});
+is_in_thread_postback(#postback{query=#query{q1=?URI_SERVICES,q3=Q3}}) -> is_in_thread_postback(#postback{query=#query{q2=Q3}});
 is_in_thread_postback(#postback{query=#query{q2=?UNDEF}}) -> false;
 is_in_thread_postback(#postback{query=#query{q2= <<>>}}) -> false;
 is_in_thread_postback(#postback{query=#query{q2=UrnT}}) ->
@@ -50,17 +56,17 @@ query_to_path(#query{q1=Q1,q2=Q2,q3=Q3,q4=Q4}) ->
         _ -> case GenPath([Q1,Q2,Q3]) of <<>> -> <<"/">>; Url -> Url end
     end.
 
-state_to_query(#st{route=#route{level=?UNDEF},board=?UNDEF}=S) ->
-    wf:info(?M,"state_to_query: ~p",[0]),
-    #query{};
-state_to_query(#st{route=#route{level=Level},board=?UNDEF}=S) ->
-    wf:info(?M,"state_to_query: ~p ~p",[1,Level]),
-    #query{q1=Level};
-state_to_query(#st{route=#route{level= <<"stream">>=L},board=B}=S) ->
-    wf:info(?M,"state_to_query: ~p",[2]),
-    #query{q1=L,q2=urn(B)};
-state_to_query(#st{board=B,thread=T,post=P,services=Svc}) ->
-    wf:info(?M,"state_to_query: ~p",[3]),
+state_to_query(?UNDEF) -> #query{};
+state_to_query(#st{route=#route{render=R,level=L}}=S) ->
+    wf:info(?M,"state_to_query: ~p",[1]),
+    case R:urn() of
+        ?URN_PAGE_DYNAMIC -> state_to_query_dyn(S);
+        PageUrn ->
+            #query{q1=PageUrn,q2=L}
+    end.
+
+state_to_query_dyn(#st{board=B,thread=T,post=P,services=Svc}) ->
+    wf:info(?M,"state_to_query_dyn: ~p",[2]),
     [Qp,Qt,Qb]=lists:foldl(fun
         (?UNDEF,QueryList) -> [?UNDEF|QueryList];
         (Record,QueryList) -> Urn=urn(Record), [Urn|QueryList]
@@ -69,6 +75,7 @@ state_to_query(#st{board=B,thread=T,post=P,services=Svc}) ->
         comments -> #query{q1=?URI_SERVICES,q2=Qb,q3=Qt,q4=Qp};
         false -> #query{q1=Qb,q2=Qt,q3=Qp}
     end.
+
 
 state_to_render(#st{route=#route{render=?UNDEF,module=Module}}) -> Module;
 state_to_render(#st{route=#route{render=Render}}) -> Render.
@@ -81,7 +88,7 @@ history_send(IsReplace) when is_boolean(IsReplace) ->
     Query=state_to_query(State),
     Secret=n2o_secret:pickle(Query),
     Render=state_to_render(State),
-    Title=Render:title(State),
+    Title=wf:jse(Render:title(State)),
     wf:info(?M,"History Query: ~p",[Query]),
     Path=query_to_path(Query),
     wf:info(?M,"History Path: ~p",[Path]),

@@ -1,0 +1,9 @@
+{application, eauth,
+  [
+    {description, "N2O Simple Authorization System"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib, kvs]},
+    {mod, { eauth, []}},
+    {env, []}
+  ]}.

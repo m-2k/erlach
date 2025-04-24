@@ -1,5 +1,5 @@
 -define(APP, erlach).
--define(ERLACH_VERSION, <<"R3 RC7">>).
+-define(ERLACH_VERSION, <<"R3 RC8">>).
 -define(ERLACH_VERSION_NUMBER, 2.993).
 
 -include_lib("n2o/include/wf.hrl").
@@ -18,7 +18,10 @@
 -define(COOKIE_PATH, <<"/">>).
 -define(SESSION_PARAMETERS_EXPIRATION_TIME, 60*60). % seconds
 -define(URI_SERVICES, <<"services">>).
+-define(URN_PAGE_DYNAMIC, <<"urn-dynamic">>).
+-define(URN_PAGE_MAIN, ?UNDEF).
 
+-define(TR(Ru,En), [#span{class=ru,body=Ru},#span{class=en,body=En}]).
 
 -define(UPLOAD_MIN_SIZE, 100).
 -define(UPLOAD_MAX_SIZE, 10485760). % 10MB
@@ -53,7 +56,7 @@
     thread,
     post
     ).
-
+    
 -include_lib("erlach_db/include/erlach_db.hrl").
 
 -type action_mode() :: view | create | edit.
@@ -96,3 +99,4 @@
 -define(STREAM,erlach_stream).
 
 -include_lib("spa/include/spa.hrl").
+-include_lib("spa/include/spa_elements.hrl").

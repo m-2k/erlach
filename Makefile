@@ -1,5 +1,5 @@
 RELEASE := erlach
-COOKIE  := node_runner
+COOKIE  := superpupercookie2k
 VER     := 1.0.0
 
 default: compile

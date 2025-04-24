@@ -1,6 +1,6 @@
 -module(erlach_svg).
--compile(export_all).
 -author('Andy').
+-compile(export_all).
 
 logo() ->
     <<"<svg width='100px' height='20px' viewBox='-2 0 284 50' version='1.1'
