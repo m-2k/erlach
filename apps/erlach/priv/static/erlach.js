@@ -1,12 +1,15 @@
 
 // Variables
 var timeouts = [];
+var scroll_timeout;
 var intervals = [];
 var pid; // page id
+var page_loaded = false;
 var enc_queue_1 = [];
 var enc_queue_2 = [];
 var enc_process_1;
 var enc_process_2;
+var time_warp = 0;
 
 var URI_GOOGLE_IMG_SEARCH='https://www.google.com/searchbyimage?&image_url=';
 var URI_TINEYE_IMG_SEARCH='https://www.tineye.com/search?pluginver=bookmark_1.0&url=';
@@ -19,8 +22,23 @@ var bpgw = new Worker('/static/bpgdec.min.js');
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 })();
 
+(function() {
+    setTimeout(function updateTime() {
+        var list = document.querySelectorAll('.post-manage .time');
+        for(var i = 0; i < list.length; i++) render_time(list[i]);
+        setTimeout(updateTime, 5000);
+    }, 10000);
+})();
+
+function totry(e,fun) { e && fun(e) };
+
+//
+// PAGE LOAD PROCESS (NOT SESSION)
+//
 function init(page_id) {
+    debug && console.log('init');
     // Clear all variables and stop timers
+    page_loaded = false;
     pid = page_id;
     timeouts.forEach(function(t){ if(t){ clearTimeout(t); if(debug) console.log('timeout cleared'); }});
     timeouts = [];
@@ -30,20 +48,28 @@ function init(page_id) {
     enc_queue_2 = [];
     enc_process_1 = false;
     enc_process_2 = false;
+    upload_queue = [];
     
     // Run funs
     textStore();
-    applySettings();
 };
+function finalize() {
+    debug && console.log('finalize');
+    
+    page_loaded = true;
+    var h = qi('header'); h && h.classList.remove('loading');
+}
+function terminate() {
+    debug && console.log('terminate');
+    page_loaded = false;
+    pauseAllBpgAnimation();
+    var h = qi('header'); h && h.classList.add('loading');
+}
+
 
 // 
 // Local Storage
-// 
-function nodeName(e) { return (e && e.nodeName) ? e.nodeName.toLowerCase() : 'unknown'; }
-function je(e) { return JSON.stringify(e) };
-function jd(e) { return JSON.parse(e) };
-function ls(k,v) { try { return v ? localStorage.setItem(je(k),je(v)) : jd(localStorage.getItem(je(k))) } catch(e) {} };
-
+//
 function lsrem(k) { localStorage.removeItem(je(k)) };
 function lsremall() { localStorage.clear() };
 function ts() { return Date.now() / 1000 | 0; };
@@ -73,14 +99,98 @@ function sub() {
 };
 
 
+function message(text,className,time) {
+    var pm = qi('popup-messages');
+    if(pm) {
+        var b = qn('button');
+        b.classList.add(className || 'info')
+        b.innerText = text;
+        b.onclick = function(e){ e.target.remove(); };
+        window.setTimeout((function(){ this && this.click() }).bind(b),time || text.length*100+4000);
+        pm.insertAdjacentElement('afterbegin', b);
+    }
+};
+
+function nodeName(e) { return (e && e.nodeName) ? e.nodeName.toLowerCase() : 'unknown'; }
+function collapse(id) { ls(['hdn',id],true); render(id); };
+function expand(id) { lsrem(['hdn',id]); render(id); };
+function render(id) {
+    var e = qi(id);
+    if(e) {
+        ls(['hdn',id]) ? e.classList.add('collapsed') : e.classList.remove('collapsed');
+        
+        var x = e.querySelector('.reply-action');
+        x && ( x.onclick = (function() {
+            var html = qn('div'), editable = qs('#input .post-message');
+            
+            html.innerHTML = '>>' + this + ' ';
+            if(window.getSelection) {
+                var s = window.getSelection().toString();
+                if(s !== '') { html.innerText = '>>' + this + ' >' + s + '\n\n'; }
+            }
+            editable.appendChild(html);
+            scrollToElement('input',true);
+            editable.focus();
+            cursorEnd(qs('#input .post-message'));
+        }).bind(e.dataset.id) );
+        x = e.querySelector('.collapse-action');
+        x && ( x.onclick = (function() { collapse(this) }).bind(id) );
+        x = e.querySelector('.expand-action');
+        x && ( x.onclick = (function() { expand(this) }).bind(id) );
+        x = e.querySelector('.pid');
+        x && ( x.innerHTML = e.dataset.id );
+        
+        render_time(e.querySelector('.time'));
+        
+        var l, lid, linkList = e.querySelectorAll('a.link');
+        for(var i=0; i < linkList.length; i++) {
+            l = linkList[i];
+            lid = l.dataset.link;
+            if(lid) {
+                l.onclick = (function() { scrollToPost(this) }).bind(lid) ;
+                l.onmouseenter = (function() { flashPost(this) }).bind(lid);
+            } 
+            
+        }
+    }
+};
+function render_time(e) {
+    if(e && e.dataset.ts) {
+        e.innerHTML = format_timestamp(parseInt(e.dataset.ts));
+    }
+};
+function render_image(id) {
+    var e = qi(id);
+    if(e) {
+        var cnv = e.querySelector('canvas.media.image');
+        cnv.addEventListener('bpg_loaded', function() { e.querySelector('.image-manage').classList.add('visibled') }, false);
+        e.querySelector('.control.play').onclick = function() { cnv.play() };
+        e.querySelector('.control.pause').onclick = function() { cnv.pause(true) };
+        e.querySelector('.control.stop').onclick = function() { cnv.stop() };
+        
+    }
+};
+
+function format_timestamp(ts) {
+    var diff = (Date.now() - new Date(ts) + time_warp)/1000;
+    var t = Math.trunc(diff/60/60/24/365); if(t > 0) return t + " г";
+        t = Math.trunc(diff/60/60/24/30);  if(t > 0) return t + " мес";
+        t = Math.trunc(diff/60/60/24);     if(t > 0) return t + " дн";
+        t = Math.trunc(diff/60/60);        if(t > 0) return t + " ч";
+        t = Math.trunc(diff/60);           if(t > 0) return t + " мин";
+    return  Math.trunc(diff) + " сек";
+};
+
+
 // 
 // Text Boxes
 // 
-function trim(str) { return str.replace(/^\s+|\s+$/g, ''); };
-function unrich(id) { var x = qi(id);
+function trim(str) { return str; };
+function unrich(id) {
+    var x = qi(id);
     x && x.addEventListener('paste', function(e) {
         e.preventDefault();
-        var text = e.clipboardData.getData('text/plain'); //.replace(/\r?\n/g,'<br/>');
+        var text = e.clipboardData.getData('text/plain');
         document.execCommand('insertHTML',false, text);
     });
 }
@@ -98,18 +208,42 @@ window.onscroll = function() {
     if(lazyLoader && (lazyLoader.getBoundingClientRect().top < window.document.body.clientHeight)) {
         lazyLoader.dispatchEvent(new CustomEvent("lazy", { bubbles: false, cancelable: false, detail: false }));
         lazyLoader = undefined;
-        console.log('lazy');
+        debug && console.log('lazy loading');
     }
+    
+    scroll_timeout && clearTimeout(scroll_timeout);
+    page_loaded && ( scroll_timeout = setTimeout(storeScroll, 500) );
 };
 
+function scrollWait(id) {
+    debug && console.log('scroll wait to '+id);
+    
+    if(id) {
+        setTimeout(function tryScroll() {
+            var e = qi(id);
+            if(e) { scrollToPost(id); }
+            else if(page_loaded) { debug && console.log('try scroll aborted'); }
+            else { debug && console.log('try scroll iteration'); setTimeout(tryScroll,60); }
+        },4);
+    } else {
+        setTimeout(function tryScrollPx() {
+            var val = (history.state && history.state.scroll) || 0;
+            if(document.body.scrollHeight > val) {
+                debug && console.log('try scrollPx SCROLL');
+                window.scrollTo(0,val)
+            } else { debug && console.log('try scrollPx iteration '+document.body.scrollHeight+' '+val); setTimeout(tryScrollPx,60); }
+        },4);
+    }
+};
 function scrollToPost(id) {
+    debug && console.log('scrollToPost("'+id+'");');
     var p=qi(id);
     if(p && p.parentNode.id === 'posts-new') {
         p.parentNode.removeAttribute('id'); // trick
         var s=qs('#posts-new-controls .control-show');
         s && s.click();
     }
-    scrollToElement(id);
+    window.setTimeout(function() { scrollToElement(id); }, 4);
 }
 function scrollToTop() { window.scrollTo(0, 0) };
 function scrollToBottom() { window.scrollTo(0,document.body.scrollHeight) };
@@ -123,7 +257,7 @@ function scrollToElement(id,disableHighlight) {
     }
 };
 function flashPost(id) {
-    var el = qs('[id="'+id+'"] .post-content');
+    var el = qs('[id="'+id+'"] .post-flash');
     if(el) {
         el.style.webkitAnimationName = el.style.animationName = '';
         window.setTimeout(function() {
@@ -139,17 +273,23 @@ function push_state(replace,state,title,url,board,thread) {
         state: state,
         title: title,
         board: board,
-        thread: thread
+        thread: thread,
+        scroll: 0
     };
     replace ? history.replaceState(s,title,url) : history.pushState(s,title,url);
 };
+function storeScroll() {
+    if(history.state) {
+        history.state.scroll = window.pageYOffset
+        history.replaceState(history.state,document.title,window.location.href);
+    };
+}
 window.addEventListener('popstate', function(e){
     var s = e.state;
     if(s) { ws.send(enc(tuple(atom('client'),tuple(atom('history'),bin(s.state)))));
         window.document.title = s.title; }
 },false);
 
-// function textStoreKey(key) { return ['text',window.location.pathname,key]; };
 function textStoreKey(key) { return ['text',[history.state.board,history.state.thread],key]; };
 function textStore() {
     var store = function(sel,key) {
@@ -197,6 +337,7 @@ function textRestore() {
 })();
 
 function uploadFileStarting(state) {
+    debug && console.log('uploadFileStarting');
     var p = qs('#input .image-process');
     p && p.classList.remove('error');
     p && p.classList.add('visibled');
@@ -204,28 +345,32 @@ function uploadFileStarting(state) {
     m && m.classList.add('visibled');
 };
 function uploadFileShowState(imContainerId,state) {
+    debug && console.log('uploadFileShowState');
     var p = qs('[id="'+imContainerId+'"] .image-process');
 };
 function uploadFileError(imContainerId) {
+    debug && console.log('uploadFileError');
     var p = qs('[id="'+imContainerId+'"] .image-process');
     p && p.classList.add('error');
 };
 function uploadFileFinished(imContainerId) {
+    debug && console.log('uploadFileFinished');
     var p = qs('[id="'+imContainerId+'"] .image-process');
     p && p.classList.remove('visibled');
 };
 
-
-
 function uploadFile(containerId, file, width, height) {
+    debug && console.log('uploadFile');
     uploadFileShowState(containerId,'Uploading');
     ftp.autostart = true;
     ftp.sid = pid;
-    ftp.filename = Date.now().toString();
+    ftp.filename = performance.now().toString();
     ftp.meta = tuple(atom('meta'),bin(containerId),number(width),number(height));
     ftp.init(file);
 };
+
 function handleFileSelect(evt) {
+    debug && console.log('handleFileSelect');
     var files = evt.target.files || evt.dataTransfer.files;
     var type = files[0].type === "" && files[0].name.endsWith('.bpg') ? 'image/bpg' : files[0].type;
     
@@ -247,20 +392,23 @@ function handleFileSelect(evt) {
 };
 
 function previewAndUploadFile(file) {
+    debug && console.log('previewAndUploadFile');
     var container = qs('#input .post-image');
     var img = container.querySelector('img.media.image');
     var cnv = container.querySelector('canvas.media.image');
     var temp = new Image(); // for preventing infinity iteration of img.media
     
-    img.setAttribute('onload','shadowOnLoad(this);');
-    img.setAttribute('onerror','shadowOnError(this);');
-    
     if(container) {
         var reader  = new FileReader();
         reader.onloadend = function () {
             temp.onload = function () {
-                uploadFile(container.id, file, this.width, this.height);
+                setTimeout((function(cid) { uploadFile(cid, file, this.width, this.height) }).bind(this,container.id), 10);
                 if(file.type == 'image/gif') {
+                    img.onload = function() {
+                        this.onload = undefined;
+                        this.setAttribute('onload','shadowOnLoad(this);');
+                        this.setAttribute('onerror','shadowOnError(this);');
+                    }
                     img.src = this.src;
                     img.classList.remove('hidden');
                     cnv.classList.add('hidden');
@@ -269,6 +417,8 @@ function previewAndUploadFile(file) {
                     cnv.width = this.width;
                     cnv.height = this.height;
                     cnv.getContext('2d').drawImage(this, 0, 0);
+                    img.setAttribute('onload','shadowOnLoad(this);');
+                    img.setAttribute('onerror','shadowOnError(this);');
                     img.classList.add('hidden');
                     cnv.classList.remove('hidden');
                     setActionOnImage(cnv);
@@ -283,6 +433,7 @@ function previewAndUploadFile(file) {
 };
 
 function previewAndUploadBpgFile(file) {
+    debug && console.log('previewAndUploadBpgFile');
     var container = qs('#input .post-image');
     uploadFile(container.id, file, 10, 10);
     
@@ -300,6 +451,7 @@ function previewAndUploadBpgFile(file) {
 };
 
 function bindExternalUri(uri) {
+    debug && console.log('bindExternalUri');
     qs('#input .post-image').setAttribute('data-open-external',uri);
     var im = qs('#input .media.image:not(.hidden)');
     im.onclick = undefined;
@@ -316,6 +468,7 @@ function getLink(e) { return parentSelector(e,".media-link") };
 function getImage(e) { return getLink(e).querySelector('.media.image:not(.hidden)') };
 
 function setActionOnImage(e) {
+    debug && console.log('setActionOnImage');
     var srv = !!qs('#main.services');
     var cnt = e.parentNode.parentNode;
     if(cnt.dataset.openExternal) {
@@ -330,6 +483,7 @@ function setActionOnImage(e) {
 };
 
 bpgw.onmessage = function(e) {
+    debug && console.log('bpgw.onmessage');
     switch(e.data.type) {
         case 'log': console.log('Worker log: ' + e.data.message); break;
         case 'debug': console.log('Worker debug: ' + e.data.data); debugger; break;
@@ -341,19 +495,13 @@ bpgw.onmessage = function(e) {
                 var cnv = qs('[id="' + e.data.meta.container + '"] canvas.media.image');
                 cnv.width = img.width;
                 cnv.height = img.height;
-            
-                var ctx = cnv.getContext('2d');
-            
-                (function() {
-                    function d() {
-                        var a = img.n;
-                        ++a >= frames.length && (0 == loop_count || img.q < loop_count ? (a = 0, img.q++) : a =- 1);
-                        0 <= a && (img.n = a, ctx.putImageData(frames[a].img, 0, 0), setTimeout(d, frames[a].duration))
-                    };
-                    ctx.putImageData(img, 0, 0);
-                    frames.length > 1 && (img.n = 0, img.q = 0, setTimeout(d, frames[0].duration));
-                }.bind(ctx,img,frames,loop_count))();
-
+                
+                cnv.bpg = {image: img, frames: frames, loop_count: loop_count, animation: frames.length > 1 };
+                if(cnv.bpg.animation) { setBPGAnimation(cnv);  cnv.stop(); }
+                else { cnv.getContext('2d').putImageData(img, 0, 0); }
+                
+                cnv.dispatchEvent(new CustomEvent("bpg_loaded", { bubbles: false, cancelable: false, detail: false }));
+                
                 cnv.classList.remove('hidden');
                 setActionOnImage(cnv);
                 
@@ -363,6 +511,48 @@ bpgw.onmessage = function(e) {
             break;
         default: console.log('Unknown event:' + e.data);
     };
+};
+
+function pauseAllBpgAnimation(current) {
+    var nodeList = document.querySelectorAll('canvas');
+    for(var i = 0; i < nodeList.length; i++) {
+        nodeList[i].pause && nodeList[i].pause();
+    }
+};
+
+function setBPGAnimation(cnv) {
+    var ctx = cnv.getContext('2d'), img = cnv.bpg.image,frames = cnv.bpg.frames, loop_count = cnv.bpg.loop_count;
+    
+    cnv.play = function() {
+        if(img.pla && !img.pau) return;
+        pauseAllBpgAnimation(ctx.canvas);
+        img.pla = true;
+        img.pau = false;
+        function d() {
+            if(img.pau) return;
+            var a = img.n;
+            ++a >= frames.length && (0 == loop_count || img.q < loop_count ? (a = 0, img.q++) : a =- 1);
+            if(0 <= a) {
+                img.n = a;
+                requestAnimationFrame((function() {
+                    ctx.putImageData(frames[a].img, 0, 0);
+                    setTimeout(d, frames[a].duration);
+                }).bind(ctx,frames,img,d));
+            };
+        };
+        frames.length > 1 && setTimeout(d, frames[0].duration);
+    }
+
+    cnv.pause = (function(img,toggle) {
+        if(img.pla) { img.pau ? toggle && ctx.canvas.play() : ( img.pau = true ) }
+    }).bind(ctx,img);
+
+    cnv.stop = (function() {
+        frames.length > 1 && ( img.pla = false, img.pau = true, img.n = 1, img.q = 0 )
+        ctx.putImageData(frames[0].img, 0, 0);
+    }).bind(ctx,frames,img);
+    
+    cnv.dataset.animation = true;
 };
 
 function replaceNode(destination,target) {
@@ -402,7 +592,10 @@ var viewer;
     }
 })();
 function viewerCollectImages() {
-    return Array.prototype.slice.call(document.querySelectorAll('#content .media.image:not(.hidden)'));
+    return Array.prototype.slice.call(document.querySelectorAll(
+        '#content .post:not(.collapsed) .media.image:not(.hidden)' +
+        ', #stream .stream-image:not(.collapsed) .media.image:not(.hidden)'
+    ));
 };
 function viewerOpen(e) {
     requestAnimationFrame(function() { // second step (thread #1, RAF)
@@ -418,6 +611,9 @@ function viewerShowImage(e) {
     e = e.target || e;    
     e = getImage(e); // when processing enabled
     
+    var bpgAnimManage = qs('#viewer .image-manage');
+    bpgAnimManage.classList.remove('visibled');
+    
     var n, url, p = e.previousSibling;
     switch(nodeName(e)) {
         case 'canvas':
@@ -429,7 +625,19 @@ function viewerShowImage(e) {
                 url = p.src;
             } else {
                 n = canvasClone2(e);
-                url = e.src;
+                url = p.dataset.url;
+                n.bpg = e.bpg;
+                
+                if(n.bpg.animation) {
+                    setBPGAnimation(n);
+                    n.pause();
+                    
+                    qs('#viewer .control.play').onclick = function() { n.play() };
+                    qs('#viewer .control.pause').onclick = function() { n.pause(true) };
+                    qs('#viewer .control.stop').onclick = function() { n.stop() };
+                    
+                    bpgAnimManage.classList.add('visibled');
+                }
             }
             break;
         default:
@@ -474,7 +682,8 @@ function viewerPrev() {
     }
 };
 function viewerClose(e) {
-    if(viewer && viewer.active && (e ? nodeName(e.target) !== 'a' : true)) {
+    if(viewer && viewer.active && (e ? (nodeName(e.target) !== 'a' && nodeName(e.target) !== 'button') : true)) {
+        pauseAllBpgAnimation();
         viewer.classList.remove('active');
         viewer.images = [];
         viewer.active = false;
@@ -487,6 +696,7 @@ function viewerClose(e) {
 
 
 function imgLoad(key,url) {
+    debug && console.log('imgLoad');
     var im = qs('[id="'+key+'"] img.media.image');
     if(im) { im.src = url; } else { console.log('Unable img loading: ' + key + ', ' + url); }
 };
@@ -500,7 +710,7 @@ function getType(e) {
     }
 }
 function shadowOnLoad(shadowed) {
-    
+    debug && console.log('shadowOnLoad');
     shadowed = shadowed.target || shadowed;
     shadowed.removeAttribute('onload');
     shadowed.removeAttribute('onerror');
@@ -511,6 +721,7 @@ function shadowOnLoad(shadowed) {
     switch(getType(shadowed)) {
         case 'bpg': console.log('Logic error 1'); break;
         case 'gif':
+            debug && console.log('shadowOnLoad GIF');
             // requestAnimationFrame((function() {
                 shadowed.classList.remove('hidden');
                 canvas.classList.add('hidden');
@@ -519,14 +730,17 @@ function shadowOnLoad(shadowed) {
             uploadFileFinished(container);
             break;
         default:
+            debug && console.log('shadowOnLoad (not GIF)');
             shadowed.classList.add('hidden');
-            drawInterpolatedThumbCanvas(canvas,shadowed);
+            var w = qs('#input [id="'+container+'"]') ? canvas.width : undefined;
+            drawInterpolatedThumbCanvas(canvas,shadowed, w);
             setActionOnImage(canvas);
             uploadFileFinished(container);
     }
 };
-function shadowOnError(shadowed) { };
+function shadowOnError(shadowed) { debug && console.log('shadowOnError'); };
 function shadowOnLoadBpg(container) {
+    debug && console.log('shadowOnLoadBpg');
     uploadFileShowState(container,'Decoding BPG');
     var url = qs('[id="'+container+'"] div.media.image').dataset.url;
     var req = new XMLHttpRequest();
@@ -541,15 +755,17 @@ function shadowOnLoadBpg(container) {
     req.send();
 };
 
-function drawInterpolatedThumbCanvas(c,i) {
-    var w, h, r = window.devicePixelRatio || 1;
+function drawInterpolatedThumbCanvas(c,i, w) { // w - optional
+    var h, r = window.devicePixelRatio || 1;
     
     if(c.parentNode.parentNode.dataset.stream) {
         h = (c.clientHeight * r) > i.height ? i.height : (c.clientHeight * r);
         w = h * (i.width / i.height);
     } else {
-        var cw = c.clientWidth || parseInt(getComputedStyle(c.parentNode.parentNode).maxWidth); // for hidden elements
-        w = (cw * r) > i.width ? i.width : (cw * r);
+        if(!w) {
+            var cw = c.clientWidth || parseInt(getComputedStyle(c.parentNode.parentNode).maxWidth); // for hidden elements
+            w = (cw * r) > i.width ? i.width : (cw * r);
+        } else { debug && console.log('Warning: canvas rendered with manual dimensions'); }
         h = w * (i.height / i.width);
     }
     
@@ -631,18 +847,36 @@ function fastCanvasResampler(c, i, maxw, maxh, fill) {
 // 
 // Settings
 // 
+function getValue(e) {
+    switch (nodeName(e)) {
+        case 'input':
+            switch (e.getAttribute("type").toLowerCase()) {
+                case 'checkbox': return e.checked;
+                default:         return e.value;
+            }
+        default: return e.value;
+    };
+}
+function setValue(e,v) {
+    switch (nodeName(e)) {
+        case 'input':
+            switch (e.getAttribute("type").toLowerCase()) {
+                case 'checkbox': e.checked = v;
+                default:         e.value = v;
+            }
+        default: e.value = v;
+    };
+}
 function loadSettings() {
-    var load=function(opt) { var x=qi('option-'+opt); x && ( x.value=ls(['opt',opt]) || x.value ) };
+    var load=function(opt) { var x=qi('option-'+opt); x && ( setValue(x, ls(['opt',opt]) || getValue(x) ) ) };
     load('nickname');
+    load('fullwidth');
     load('theme');
 };
 function saveSettings() {
-    var save=function(opt) { var x=qi('option-'+opt); x && ( ls(['opt',opt],x.value) ) };
+    var save=function(opt) { var x=qi('option-'+opt); x && ( ls(['opt',opt], getValue(x)) ) };
     save('nickname');
+    save('fullwidth');
     save('theme');
     applySettings();
 };
-function applySettings() {
-    var t = ls(['opt','theme']);
-    t && ( document.body.className = t );
-}

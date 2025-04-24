@@ -8,11 +8,11 @@ title(#st{}) -> <<"About – Erlach"/utf8>>.
 urn() -> ?UNDEF.
 
 subscr() -> [
-    {<<"Posts: ">>,             {post,total},        fun wf:to_binary/1 },
-    {<<"Threads: ">>,           {thread,total},      fun wf:to_binary/1 },
-    {<<"Images: ">>,            {attachment,total},  fun wf:to_binary/1 },
-    {<<"Views: ">>,             {view,total},        fun wf:to_binary/1 },
-    {<<"Reading: ">>, {time,online,total}, fun(C) -> wf:f("~b h",[trunc(C/3600)]) end}
+    {<<"Постов: "/utf8>>,       {post,total},        fun wf:to_binary/1 },
+    {<<"Тредов: "/utf8>>,       {thread,total},      fun wf:to_binary/1 },
+    {<<"Изображений: "/utf8>>,  {attachment,total},  fun wf:to_binary/1 },
+    {<<"Просмотров: "/utf8>>,   {view,total},        fun wf:to_binary/1 },
+    {<<"Чтение: "/utf8>>,       {time,online,total}, fun(C) -> [wf:to_binary(trunc(C/3600)),<<" ч"/utf8>>] end}
     ].
 
 init(#route{}=Route) ->
@@ -27,10 +27,11 @@ terminate() ->
 render(content=Panel,#st{}=S) ->
     wf:info(?M,"About",[]),
     #panel{id=Panel,body=[
-        #panel{class= <<"content-title">>,body= <<"About Erlach">>},
-        #span{class= <<"remark">>,body= <<"Erlach Imageboard Services, 2015-2016">>},
+        #panel{class= <<"content-title">>,body= <<"Эрлач"/utf8>>},
+        #span{class= <<"remark">>,body=
+            <<"Полностью анонимная имиджборда и сервис анонимных комментариев, 2015-2016"/utf8>>},
         #panel{class= <<"center">>,body=[
-            #panel{class= <<"erlach-version">>, body= <<"Version: <strong>",(?ERLACH_VERSION)/binary,"</strong>">>},
+            #panel{class= <<"erlach-version">>, body= <<"Версия: <strong>"/utf8,(?ERLACH_VERSION)/binary,"</strong>"/utf8>>},
             #panel{class= <<"erlach-feedback">>, body= <<"&#116;&#119;&#105;&#116;&#64;erlach&#46;co">>},
             render(statistics,S)
         ]}

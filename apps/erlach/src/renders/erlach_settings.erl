@@ -13,6 +13,10 @@ render(settings=Panel) ->
                 placeholder= <<"Аноним"/utf8>>,autofocus=autofocus,disabled=true}
         ]},
         #panel{class= <<"setting-option">>,body=[
+            #checkbox{id= <<"option-fullwidth">>},
+            #span{class= <<"opt-fullwidth">>,body= <<"Полноформатный текст"/utf8>>}
+        ]},
+        #panel{class= <<"setting-option">>,body=[
             #span{body= <<"Тема"/utf8>>},
             #dropdown{id= <<"option-theme">>,title= <<"Выбери тему"/utf8>>,
                 source=[theme],
@@ -27,7 +31,7 @@ render(settings=Panel) ->
         "loadSettings();",
         #bind{target= <<"option-theme">>,type=change,postback= <<"saveSettings();">>}
     ]}.
-
+  
 event(#view{target=window,option=show}) ->
     wf:update(settings,render(settings)),
     wf:wire([

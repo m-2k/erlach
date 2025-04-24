@@ -50,8 +50,6 @@ progress(Color) ->
          version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'>
       <g transform='translate(50, 50)'>
         <circle cx='0' cy='0' r='40' style='fill:rgba(0,0,0,0);stroke:",Color/binary,"; stroke-width:1; stroke-dasharray:75, 50;'>
-          <animateTransform attributeType='xml' attributeName='transform' type='rotate'
-              from='0' to='360' begin='0' dur='15s' repeatCount='indefinite' />
         </circle>
       </g>
     </svg>">>.

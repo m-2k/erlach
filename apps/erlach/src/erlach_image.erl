@@ -2,6 +2,7 @@
 -author('Andy').
 -compile(export_all).
 
+% https://gist.github.com/m-2k/758d25266a444515b724
 % apt-get install libjpeg-progs
 
 -include("erlach.hrl").
@@ -39,15 +40,23 @@ restart(Group) ->
         #handler{}=H -> n2o_async:start(H);
         _ -> n2o_async:start(#handler{module=?M,group=?APP,class=?SUP_CLASS,name=Group,state=#state{}})
     end.
-convert(Key,Group,Source,Storage,Path,Meta,Target,FinallyFun,ErrorFun) ->
+convert(Key,Group,Source,Storage,Path,Meta,Target,FinallyFun,ErrorFun,AutoStart) ->
     wf:info(?M,"(~p) Call convert ~p ~p",[self(),Key,Source]),
     case n2o_async:pid({?SUP_CLASS,Group}) of Pid when is_pid(Pid) -> ok; _ -> restart(Group) end,
     E=#entry{id=Key,group=Group,
         source=Source,storage=Storage,path=Path,meta=Meta,target=Target,
-        finally=FinallyFun,error=ErrorFun,from=self()},
+        finally=FinallyFun,error=ErrorFun,autostart=AutoStart,from=self()},
     n2o_async:send(?SUP_CLASS,Group,{insert_entry,E}).
+
+run(Key,Group) ->
+    wf:info(?M,"(~p) Run entry ~p ~p",[self(),Key,Group]),
+    n2o_async:send(?SUP_CLASS,Group,{run_entry,Key}).
 update(Key,Group,Fun) -> n2o_async:send(?SUP_CLASS,Group,{upadate_entry,Key,Fun}).
-abort(Key,Group) -> n2o_async:send(?SUP_CLASS,Group,{abort_entry,Key}).
+remove_pending(Pid,Group) when is_pid(Pid) ->
+    wf:info(?M,"(~p) Remove entries by pid ~p ~p",[self(),Pid,Group]),
+    n2o_async:send(?SUP_CLASS,Group,{remove_entries,Pid,pending}).
+abort(Key,Group) -> abort(Key,Group,false).
+abort(Key,Group,User) -> n2o_async:send(?SUP_CLASS,Group,{abort_entry,Key,User}).
 dump(Group) -> n2o_async:send(?SUP_CLASS,Group,dump).
 stop(Group) -> n2o_async:stop(?SUP_CLASS,Group).
 
@@ -69,9 +78,9 @@ stage(#entry{infoA=#jpeg{},stage=starting,source=SP,destination=DP}=E) ->
     Mem=wf:to_binary(wf:config(erlach,jpegtran_maxmemory,524288)),
     Cmd=["jpegtran -copy none -optimize -maxmemory ",Mem," -outfile ",DP," ",SP],
     {ok, Cmd, E#entry{stage=finishing}};
-stage(#entry{infoA=#png{},stage=starting,source=SP}=E)                ->
-    {ok, ["optipng ",wf:config(erlach,optipng_opts,"-o0")," ",SP],   E#entry{stage=optipng}};
-stage(#entry{infoA=#png{},stage=optipng, source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
+stage(#entry{infoA=#png{},stage=starting,source=SP,destination=DP}=E) ->
+    Options=wf:config(erlach,optipng_opts,"-zc9 -zm8 -zs0 -f0 -nb -nc -np -nx -fix"),
+    {ok, ["optipng ",Options," -out ",DP," ",SP], E#entry{stage=finishing}};
 stage(#entry{infoA=#gif{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
 stage(#entry{infoA=#bpg{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}}.
 
@@ -88,7 +97,7 @@ spawn_external(#entry{id=Key}=E,#state{entry_map=EM,port_map=PM}=S) ->
     end.
     
 reply_error(#entry{id=Key,target=T,meta=M,from=F}=E,Error,#state{}=S) ->
-    wf:info(?M,"(~p) Reply error ~p ~p",[self(),T,Error]),
+    wf:warning(?M,"(~p) Reply error ~p ~p",[self(),T,Error]),
     D=case Error of {error,_} -> Error; _ -> {error,Error} end,
     Msg=#pubsub{target=image,action=convert,element=Key,meta=M,data=D,from=F},
     wf:send(T,{server,Msg}).
@@ -129,7 +138,7 @@ error(#entry{id=Key,error=Fun,destination=DP}=E,Error,#state{entry_map=EM}=S) ->
         #entry{}=E2 -> {E2,S#state{entry_map=maps:update(Key,E2,EM)}};
         _ -> {E,clear(E,S)}
     end,
-    reply_error(E3,Error,S),
+    case Error of abort_by_user -> skip; _ -> reply_error(E3,Error,S) end,
     S2.
 
 proc(init,#handler{group=G,class=C,name=N}=H) ->
@@ -137,24 +146,16 @@ proc(init,#handler{group=G,class=C,name=N}=H) ->
     {ok,H};
 proc(dump,#handler{state=#state{queue=Q,entry_map=EM,port_map=PM}=S}=H) ->
     io:format("~p: (~p) Converter status queue count: ~p, entries count ~p~n",[?M,self(),length(Q),maps:size(EM)]),
-    io:format("  Queue list:~n",[]), [ io:format("    | ~p~n",[Qi]) || Qi <- Q ],
+    io:format("  Queue list: ~p~n",[Q]),
     io:format("  Entry list:~n",[]), [ io:format("    | #{~p => ~p}~n",[EMk,EMv]) || {EMk,EMv} <- maps:to_list(EM) ],
     io:format("  Port map list:~n",[]), [ io:format("    | #{~p => ~p}~n",[PMk,PMv]) || {PMk,PMv} <- maps:to_list(PM) ],
     {reply,ok,H};
-proc({insert_entry,#entry{id=Key,source=SP,storage=Storage,path=Path}=E},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
+proc({insert_entry,#entry{id=Key,autostart=AS}=E},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
     wf:info(?M,"(~p) Insert entry ~p",[self(),Key]),
-    case check_file(SP) of
-        {ok,InfoA} ->
-            Q2=Q++[Key],
-            DP=destination(SP,Storage,Path,InfoA),
-            EM2=maps:put(Key,E#entry{stage=starting,infoA=InfoA,destination=DP},EM),
-            filelib:ensure_dir(DP),
-            self() ! {command,check_queue},
-            {reply,ok,H#handler{state=S#state{queue=Q2,entry_map=EM2}}};
-        Error ->
-            error(E,Error,S),
-            {reply,error,H}
-    end;
+    Q2=Q++[Key],
+    EM2=maps:put(Key,E#entry{stage=pending},EM),
+    case AS of true -> self() ! {run_entry,Key}; _ -> skip end,
+    {reply,ok,H#handler{state=S#state{queue=Q2,entry_map=EM2}}};
 proc({command,check_queue},#handler{state=#state{queue=[]}}=H) ->
     {reply,ok,H};
 proc({command,check_queue},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
@@ -168,6 +169,24 @@ proc({command,check_queue},#handler{state=#state{queue=Q,entry_map=EM}=S}=H) ->
         _ -> wf:info(?M,"(~p) Check queue: PROCESS",[self()]), S
     end,
     {reply,ok,H#handler{state=S3}};
+proc({run_entry,Key},#handler{state=#state{entry_map=EM}=S}=H) ->    
+    wf:info(?M,"(~p) Run entry",[self()]),
+    case maps:get(Key,EM,false) of
+        #entry{stage=pending,source=SP,storage=Storage,path=Path}=E ->
+            case check_file(SP) of
+                {ok,InfoA} ->
+                    DP=destination(SP,Storage,Path,InfoA),
+                    filelib:ensure_dir(DP),
+                    self() ! {command,check_queue},
+                    EM2=maps:update(Key,E#entry{stage=starting,infoA=InfoA,destination=DP},EM),
+                    {reply,ok,H#handler{state=S#state{entry_map=EM2}}};
+                Error ->
+                    S2=error(E,Error,S),
+                    {reply,error,H#handler{state=S2}}
+            end;
+        false -> {reply,ok,H}
+    end;
+    
 proc({upadate_entry,Key,Fun},#handler{state=#state{entry_map=EM}=S}=H) when is_function(Fun,1) ->
     wf:info(?M,"(~p) Update entry",[self()]),
     EM2=case maps:get(Key,EM,false) of
@@ -175,9 +194,30 @@ proc({upadate_entry,Key,Fun},#handler{state=#state{entry_map=EM}=S}=H) when is_f
         false -> EM
     end,
     {reply,ok,H#handler{state=S#state{entry_map=EM2}}};
-proc({abort_entry,Key},#handler{state=S}=H) -> % TODO:
-    wf:info(?M,"(~p) Aborting ~p",[self(),Key]),
+proc({remove_entries,Pid,Stage},#handler{state=#state{entry_map=EM}=S}=H) when is_pid(Pid) ->
+    wf:info(?M,"(~p) Remove entries by {pid:~p,stage:~p}",[self(),Pid,Stage]),
+    Fold=fun(Key,E,Acc) -> case E of #entry{stage=Stage,from=Pid} -> [Key|Acc]; _ -> Acc end end,
+    [ self() ! {abort_entry,Key,false} || Key <- maps:fold(Fold,[],EM) ],
     {reply,ok,H};
+proc({abort_entry,Key,User},#handler{state=#state{entry_map=EM}=S}=H) -> % TODO:
+    wf:warning(?M,"(~p) Aborting ~p",[self(),Key]),
+    Kill=fun(#entry{port=P}) -> % not for error/3, ONLY for abort
+        wf:info(?M,"Kill port: ~p",[P]),
+        case erlang:port_info(P, os_pid) of
+            {os_pid, OsPid} ->
+                Cmd="kill -9 "++wf:to_list(OsPid),
+                wf:warning(?M,"Kill cmd: ~p",[Cmd]),
+                os:cmd(Cmd);
+            _ -> skip
+        end
+    end,
+    
+    S2=case maps:find(Key,EM) of
+        {ok,#entry{}=E} when User =:= true -> Kill(E), error(E,abort_by_user,S);
+        {ok,#entry{}=E} -> Kill(E), error(E,abort,S);
+        error -> S
+    end,
+    {reply,ok,H#handler{state=S2}};
 proc({Port,{exit_status,0}},#handler{state=#state{queue=Q,entry_map=EM,port_map=PM}=S}=H) ->
     wf:info(?M,"(~p) Spawn finished ~p",[self(),Port]),
     S3=case find_entry(Port,S) of
@@ -206,12 +246,14 @@ proc({Port,{exit_status,0}},#handler{state=#state{queue=Q,entry_map=EM,port_map=
 proc({Port,{exit_status,_Status}=Reason},#handler{state=S}=H) when is_port(Port) ->
     wf:error(?M,"(~p) Spawn failed with status ~p ~p",[self(),Reason,Port]),
     S2=case find_entry(Port,S) of
-        {ok,#entry{}=E} -> wf:info(?M,"Error calling...",[]), error(E,{error,Reason},S);
+        {ok,#entry{}=E} -> wf:error(?M,"Error calling... ~p",[Reason]), error(E,{error,Reason},S);
         _ -> wf:warning(?M,"(~p) Skiping clearing (entry not found) ~p",[self(),Port]), S
     end,
     {reply,error,H#handler{state=S2}};
 % работа порта была прервана
-proc({'EXIT',Port,Reason},H) -> proc({Port,{exit,Reason}},H);
+proc({'EXIT',Port,Reason},H) ->
+    wf:error(?M,"(~p) Spawn aborted with status ~p ~p",[self(),Reason,Port]),
+    proc({Port,{exit,Reason}},H);
 proc(Unknown,H) ->
     wf:warning(?M,"Unknown event ~p",[Unknown]),
     {reply,unknown,H}.

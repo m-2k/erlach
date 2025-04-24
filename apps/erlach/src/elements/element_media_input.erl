@@ -31,7 +31,7 @@ render_element(#media_input{id=Id,image=ImId,target=Target,disabled=Disabled}) w
     
     MakeAsContentEditable=fun(Editable) ->
         wf:wire(#bind{target=Editable,type=keydown,
-            postback=["if(event.metaKey && !event.ctrlKey && event.which === 13){qi('",Store,"').click();};"]}),
+            postback=["if((event.metaKey || event.ctrlKey) && event.which === 13){qi('",Store,"').click();};"]}),
         wf:wire(#bind{target=Editable,type=focusout,postback="event.target.innerText=trim(event.target.innerText);"}),
         wf:wire(#bind{target=Editable,type=blur,postback="event.target.innerText=trim(event.target.innerText);"}), % FF fix
         wf:wire("unrich('"++Editable++"');"),
@@ -43,29 +43,32 @@ render_element(#media_input{id=Id,image=ImId,target=Target,disabled=Disabled}) w
     wf:wire(wf:f("qi('~s').addEventListener('change', handleFileSelect, false);",[AddImageInput])),
     Controls=#panel{class= <<"input-controls center">>,body=[
         % submit(Store),
-        #button{id=Store,class=[ClassStore,<<"store-button">>],disabled=Disabled,body= <<"Store">>},
+        #button{id=Store,class=[ClassStore,<<"store-button">>],disabled=Disabled,body= <<"Отправить"/utf8>>},
         case Target of
-            thread -> #button{class=Class,body= <<"Cancel">>,postback=#cancel{target=input,panel=Panel}};
+            thread -> #button{class=Class,body= <<"Отмена"/utf8>>,postback=#cancel{target=input,panel=Panel}};
             post ->
-                #button{id=Sage,class=[Class,<<"sage-button">>],body= <<"Sage">>,
+                #button{id=Sage,class=[Class,<<"sage-button">>],body= <<"Сажи"/utf8>>,
                     postback=#render_event{target=input,event={sage,true,Sage}},value=false}
         end,
-        #button{id=AddImage,class=Class,body= <<"Image">>,onclick=wf:jse(wf:f("qi('~s').click();",[AddImageInput]))},
+        #button{id=AddImage,class=Class,body= <<"Картинка"/utf8>>,onclick=wf:jse(wf:f("qi('~s').click();",[AddImageInput]))},
         #input{id=AddImageInput,type=file}
         ]},
     
+    ImageControls=#panel{class= <<"image-manage">>,body=[
+        #label{for=Selector,class=["control-thumb",l,sea,checked],body= <<"Формат"/utf8>>}
+    ]},
     III=[
         #input{id=Selector,type= <<"checkbox">>,class= <<"input-selector">>,postback=?UNDEF},
         case Target of thread -> Controls; _ -> [] end,
         #panel{class= <<"post-content">>,body=[
-            #label{class= <<"image-manage">>,for=Selector,body=#panel{body=[ % TODO: js fix replacing label to div
-                #panel{body=#button{class=["control-thumb",sea,checked],body= <<"Size">>}}
-                ]}},
-            image_panel(Image,empty,false,?UNDEF,?UNDEF,[],?UNDEF,?UNDEF),
-            case Target of
-                thread -> #panel{id=Topic,class= <<"post-topic single-line">>,data_fields=[{placeholder,<<"Type topic here…"/utf8>>}]};
-                post -> [] end,
-            #panel{id=Input,class= <<"post-message">>,data_fields=[{placeholder,<<"Type message here…"/utf8>>}]}
+            #panel{class= <<"post-flash">>,body=[
+                image_panel(Image,empty,false,?UNDEF,?UNDEF,[],?UNDEF,?UNDEF,ImageControls),
+                case Target of
+                    thread -> #panel{id=Topic,class= <<"post-topic single-line">>,
+                        data_fields=[{placeholder,<<"С чем пожаловал, ананас?"/utf8>>}]};
+                    post -> [] end,
+                #panel{id=Input,class= <<"post-message">>,data_fields=[{placeholder,<<"Сообщение…"/utf8>>}]}
+            ]}
         ]},
         case Target of thread -> []; post -> Controls end
     ],
@@ -77,9 +80,10 @@ render_action(#event{postback=P,actions=_A,source=S,target=C,type=T,delegate=D,v
     PostbackBin = wf_event:new(P, Element, D, event, Data, []),
     wf:render(#bind{postback=PostbackBin,target=Element,type=wf:to_binary(T)}).
     
-image_panel(Id,Class,IsProgress,W,H,Fields,Url,Type) ->
+image_panel(Id,Class,IsProgress,W,H,Fields,Url,Type,ImageControls) ->
     ProgressClass=["image-process fl cent",case IsProgress of true -> "visibled"; _ -> [] end],
     #panel{id=Id,class=["post-image",Class],data_fields=Fields,body=[
+        ImageControls,
         #link{class= <<"media-link">>,body=[
             #panel{class=ProgressClass,body=wf:jse(erlach_svg:progress(<<"#fe8675">>))},
             case Type of
@@ -93,5 +97,3 @@ image_panel(Id,Class,IsProgress,W,H,Fields,Url,Type) ->
             #canvas{class=[media,image,case IsProgress of true -> []; _ -> hidden end],width=W,height=H}
         ]}
     ]}.
-
-    

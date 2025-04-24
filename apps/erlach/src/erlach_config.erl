@@ -2,7 +2,7 @@
 -compile(export_all).
 
 debug() -> true.
-log_level() -> info.
+log_level() -> wf:config(erlach,log_level,info).
 log_modules() ->
     wf:config(erlach,log_modules,[
 
@@ -17,6 +17,7 @@ log_modules() ->
         n2o_document,
         n2o_proto,
         n2o_relay,
+        n2o_file,
 
         spa_event,
         spa_feeds,
@@ -44,6 +45,7 @@ log_modules() ->
         erlach_thread,
         erlach_stream,
         erlach_services,
+        erlach_event_router,
         erlach_utils,
         erlach_image,
         erlach_about,

@@ -17,7 +17,7 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](erlach-R3-RC5-october-2016-white.png)
+![Screenshot](erlach-R3-RC7-october-2016-white.png)
 
 
 ## Requirements
@@ -60,3 +60,4 @@ erlach_db:init_db().
 
 ## Credits
 * [Namdak Tonpa](https://github.com/5HT/)
+* [tai](https://github.com/rusjava8/)

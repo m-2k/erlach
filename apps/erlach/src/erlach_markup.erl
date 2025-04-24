@@ -4,7 +4,9 @@
 
 -include("erlach.hrl").
 
-enc(D) -> wf:html_encode(D).
+enc(D) ->
+    X=wf:html_encode(D),
+    re:replace(X,<<"\\\\">>,<<"\\&#92;">>, [global,{return,binary}]). % \\& for 're' syntax
 
 html(#post{message=Raw},#hes{}=Hes,#st{}=S) ->
     
@@ -35,10 +37,12 @@ html(#post{message=Raw},#hes{}=Hes,#st{}=S) ->
     FunItalic=fun(capture,Data) -> {form,#span{class=italic,body=enc(Data)}}; (text,T) -> {text,T} end,
     FunStrikeOut=fun(capture,Data) -> {form,#span{class=strikeout,body=enc(Data)}}; (text,T) -> {text,T} end,
     FunCitate=fun(capture,Data) -> {form,#span{class=citate,body=enc(Data)}}; (text,T) -> {text,T} end,
+    CutUri=fun(Uri) -> erlach_utils:cut(Uri,wf:config(erlach,uri_max_length,50)) end,
+    
     FunWebUrls=fun(capture,[Scheme,Uri]) ->
             Sh=case Scheme of <<>> -> <<"http://">>; _ -> Scheme end,
-            #link{target="_blank",class=l,body=enc(erlach_utils:cut(Uri,wf:config(erlach,uri_max_length,50))),href=[Sh,Uri]};
-        (text,T) -> enc(T)
+            {form,#link{target="_blank",class=l,body=enc(CutUri(Uri)),href=enc([Sh,Uri])}};
+        (text,T) -> {text,T}
     end,
     
     Stage=fun(Tag,Data,Fun) -> lists:flatten([
@@ -47,14 +51,20 @@ html(#post{message=Raw},#hes{}=Hes,#st{}=S) ->
     Markup=fun(Stage0) ->
         Stage1=Stage(post_link,Stage0,FunHookups),
         Stage2=Stage(board_link,Stage1,FunBoards),
-        Stage3=Stage(spoiler,Stage2,FunSpoiler),
-        Stage4=Stage(bold,Stage3,FunBold),
-        Stage5=Stage(italic,Stage4,FunItalic),
-        Stage6=Stage(strikeout,Stage5,FunStrikeOut),
-        Stage7=Stage(citate,Stage6,FunCitate),
-        [ case Type of text -> parse_replace(Data,url_replace,FunWebUrls); form -> Data end || {Type,Data} <- Stage7 ]
+        
+        Stage3=Stage(citate,Stage2,FunCitate),
+        Stage4=Stage(spoiler,Stage3,FunSpoiler),
+        Stage5=Stage(bold,Stage4,FunBold),
+        
+        % Stage5a=Stage(ym_url_replace,Stage5,FunYandexMusicUrls),
+        Stage6=Stage(url_replace,Stage5,FunWebUrls),
+         
+        Stage7=Stage(italic,Stage6,FunItalic),
+        Stage8=Stage(strikeout,Stage7,FunStrikeOut),
+        
+        [ case X of {form,F} -> F; {text,T} -> enc(T); Raw -> enc(Raw) end || X <- Stage8 ]
     end,
-
+    
     Markup([{text,Message}]).
 
 
@@ -68,10 +78,10 @@ parse_replace(Data,RegexTag,Fun) ->
 re(post_link) -> {ok,Re}=re:compile(<<">>([a-z0-9]{1,10})\\b">>),Re;
 re(board_link) -> {ok,Re}=re:compile(<<">>\\/([a-z0-9]{1,3})\\/?">>),Re;
 
-re(spoiler) -> {ok,Re}=re:compile(<<"(?:(?:\\%\\%(.+?)\\%\\%)|(?:\\[s\\](.+?)\\[\\/s\\]))">>),Re;
-re(bold) -> {ok,Re}=re:compile(<<"(?:(?:\\*\\*(.+?)\\*\\*)|(?:\\_\\_(.+?)\\_\\_)|(?:\\[b\\](.+?)\\[\\/b\\]))">>),Re;
-re(italic) -> {ok,Re}=re:compile(<<"(?:(?:\\*(.+?)\\*)|(?:\\_(.+?)\\_)|(?:\\[i\\](.+?)\\[\\/i\\]))">>),Re;
-re(strikeout) -> {ok,Re}=re:compile(<<"(\\p{Xwd}+)\\^W">>),Re;
+re(spoiler) -> {ok,Re}=re:compile(<<"(?:(?:\\%\\%(.+?)\\%\\%)|(?:\\[s\\](.+?)\\[\\/s\\]))">>,[dotall]),Re;
+re(bold) -> {ok,Re}=re:compile(<<"(?:(?:\\*\\*(.+?)\\*\\*)|(?:\\_\\_(.+?)\\_\\_)|(?:\\[b\\](.+?)\\[\\/b\\]))">>,[dotall]),Re;
+re(italic) -> {ok,Re}=re:compile(<<"(?:(?:\\*(.+?)\\*)|(?:\\_(.+?)\\_)|(?:\\[i\\](.+?)\\[\\/i\\]))">>,[dotall]),Re;
+re(strikeout) -> {ok,Re}=re:compile(<<"(\\p{Xwd}+)\\^W">>,[unicode]),Re;
 re(citate) -> {ok,Re}=re:compile(<<"(\\>.+\\S)">>),Re;
 % re(paragraph) -> {ok,Re}=re:compile(<<"(\\n\\n)">>),Re;
 
@@ -83,7 +93,7 @@ re(url_replace) ->
                          "(?:\\.(?:[a-z0-9]-*)*[a-z0-9]+)*",  % domain name
                          "(?:\\.(?:[a-z]{2,}))",              % TLD identifier
                          "(?:\\.)?",                          % TLD may end with dot
-                         ")(?:[/?#]\\S*)?)">>,[unicode]),Re.  % resource path
+                         ")(?:[/?#][\\S_]*)?)">>,[unicode]),Re.  % resource path
 
 re_compiled(post_link) ->
     {re_pattern,1,0,0,

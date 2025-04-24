@@ -28,7 +28,6 @@
 -record(subscribe,    { ?RDR_EV(?RDR_PUBSUB_RENDER), uid }).
 -record(unsubscribe,  { ?RDR_EV(?RDR_PUBSUB_RENDER), uid }).
 
-
 -ifndef(QUERY_EXT).
 -define(QUERY_EXT, q1).
 -endif.
@@ -45,7 +44,6 @@
     render :: atom(),
     level :: binary(),
     option :: any(),
-    % history TODO: для того чтобы не хайлайтить элементы если вернулся по кнопке назад
     ?ROUTE_EXT
     }).
 

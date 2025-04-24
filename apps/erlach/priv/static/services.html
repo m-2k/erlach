@@ -6,6 +6,11 @@
         <title></title>
     </head>
     <body>
+        <script>
+            function je(e) { return JSON.stringify(e) };
+            function jd(e) { return JSON.parse(e) };
+            function ls(k,v) { try { return v !== undefined ? localStorage.setItem(je(k),je(v)) : jd(localStorage.getItem(je(k))) } catch(e) {} };
+        </script>
         <header id='services-header'>
             <a target="_blank" href='https://erlach.co/about'>
                 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="976 3509 1118 89" version="1.1">
@@ -56,17 +61,25 @@
         <script src='/n2o/ftp.js'></script>
         <script src='/n2o/validation.js'></script>
         <script src='/static/erlach.js'></script>
-        
-        <script>protos=[$client,$bert];N2O_start();</script>
 
+        <script>protos=[$bert];N2O_start();</script>
+        
         <script>
             window.monitor = setInterval(function() {
                 var doc = qi('main');
                 var h = doc.clientHeight + doc.offsetTop;
                 if(window.h !== h)  {
+                    var loc = document.location.toString().replace(/\/$/, "");
+                    debug && console.log('referrer: ' + document.referrer);
+                    debug && console.log('location: ' + loc);
                     window.h = h;
-                    var host = 'http://localhost:8000';
-                    window.parent.postMessage({service:'erlach',api:3,action:'resize',height:h},host);
+                    window.parent.postMessage({
+                        service: 'erlach',
+                        api: 3,
+                        location: loc,
+                        action: 'resize',
+                        height: h
+                    }, document.referrer);
                 }}, 60);
         </script>
     </body>

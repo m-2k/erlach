@@ -1,6 +1,6 @@
 -define(APP, erlach).
--define(ERLACH_VERSION, <<"R3 RC5">>).
--define(ERLACH_VERSION_NUMBER, 2.991).
+-define(ERLACH_VERSION, <<"R3 RC7">>).
+-define(ERLACH_VERSION_NUMBER, 2.993).
 
 -include_lib("n2o/include/wf.hrl").
 -include_lib("nitro/include/nitro.hrl").
@@ -31,7 +31,7 @@
 -define(USER_ACTIVATION,activation).
 -define(RPL,<<">>"/utf8>>).
 -define(RPL_A,<<"↩"/utf8>>).
-    
+
 -define(QUERY_EXT,
     q1 :: ?UNDEF | binary(),
     q2 :: ?UNDEF | binary(),
@@ -90,6 +90,8 @@
 -define(EVENT_ROUTER,spa_proxy).
 -define(SPA,erlach_spa).
 -define(SUB,erlach_subscription).
+-define(BOARD,erlach_board).
+-define(THREAD,erlach_thread).
 -define(SERVICES,erlach_services).
 -define(STREAM,erlach_stream).
 

@@ -1,5 +1,6 @@
 -module(erlach_spa).
 -compile(export_all).
+% -compile({parse_transform, shen}).
 -author('Andy').
 
 -include("erlach.hrl").
@@ -10,10 +11,12 @@ event(init) ->
     wf:info(?M,"init ~p",[self()]),
     Route=?CTX#cx.path,
     
-    normilize_page(),
+    normalize_page(),
     navigate(Route),
     erlach_qs:history_init(),
     erlach_subscription:pickup_data(),
+    
+    wf:wire(wf:f("time_warp=Date.now()-~b;",[spa_utils:now_js(erlang:timestamp())])),
     
     case spa:st() of
         #st{services=comments} -> skip;
@@ -22,6 +25,7 @@ event(init) ->
             spa:update(?SPA,footer),
             spa:update(?SPA,'erlach-logo')
     end,
+    
     wf:info(?M,"init ~p",[ok]);
 event({server,{debug,st}}) -> wf:info(?M,"DEBUG STATE~n~p",[spa:st()]);
 event({server,{debug,mq}}) -> wf:info(?M,"DEBUG MQ~n~p",[[ P || {{pool,_},_}=P <- get()]]);
@@ -37,7 +41,7 @@ update_all(Render) ->
     end,
     spa:update(Render,content).
 
-normilize_page() ->
+normalize_page() ->
     ok.
 init_render(Route) ->
     spa:id_erase(),
@@ -48,6 +52,7 @@ init_render(Route) ->
     Route#route{page_id=PageId}.
     
 terminate_render() ->
+    wf:wire("terminate();"),
     case spa:st() of
         #st{route=#route{render=R,page_id=PageId}}=S ->
             erlach_stat:time_stop(S),
@@ -62,6 +67,7 @@ navigate(#postback{action=view,history=H,query=#query{q2=Urn2,q3=Urn3}=Q,route_o
         true ->
             Fun=case O of state_update_only -> up_state; _ -> scroll_to end,
             erlach_thread:Fun(erlach_qs:urn_to_id(wf:coalesce([Urn3,Urn2])));
+            % skip;
         _ ->
             navigate((erlach_routes:route(Q))#route{option=O}),
             case H of true -> erlach_qs:history_push(); _ -> skip end
@@ -80,7 +86,15 @@ navigate(#route{render=Render}=R) ->
             erlach_stat:time_start(S),
             spa:st(S#st{access=erlach_auth:access()}),
             update_all(Render),
-            Render:finalize(spa:st()),
+            Finalize=case Render:finalize(spa:st()) of F when is_list(F) -> F; _ -> [] end,
+            case proplists:get_value(scroll,Finalize) of
+                Pid when is_integer(Pid) -> wf:wire(["scrollWait('",erlach_utils:post_id(Pid),"');"]);
+                _ -> wf:wire(["scrollWait();"])
+            end,
+            case proplists:get_bool(wait_finalize,Finalize) of
+                true -> skip;
+                false -> wf:wire("finalize();")
+            end,
             wf:info(?M, "~p navigate to: ~p",[self(),R3]),
             []
         % Error ->
@@ -97,21 +111,20 @@ render('erlach-logo'=Panel,#st{}) ->
 render(manage=Panel,#st{}=S) ->
     Btn=spa:temp_id(),
     #panel{id=Panel,body=[
-        #a{id=Btn,class=selector,body= <<"Notify">>,postback=#view{render=erlach_main,target=sidebar,option=true,element=Btn}}
+        #a{id=Btn,class=selector,body= <<"Ответы"/utf8>>,
+            postback=#view{render=erlach_main,target=sidebar,option=true,element=Btn}}
     ]};
 render(footer=Panel,#st{access=A}) ->
     ExtClass= <<"b ext">>,
     IntClass= <<"b">>,
     #panel{id=Panel,body=[
         #panel{class= <<"related-links">>,body=[
-            #link{class=ExtClass, target="_blank", body= <<"BLOG"/utf8>>, href= <<"http://blog.erlach.co">>},
+            #link{class=ExtClass, target="_blank", body= <<"Блог"/utf8>>, href= <<"http://blog.erlach.co">>},
             #link{class=ExtClass, target="_blank", body= <<"LING"/utf8>>, href= <<"http://erlangonxen.org">>},
             #link{class=ExtClass, target="_blank", body= <<"BPG"/utf8>>, href= <<"http://bellard.org/bpg/">>},
-            #a{class=[IntClass,new], body= <<"Настройки"/utf8>>, source=[x],
+            #a{class=IntClass, body= <<"Настройки"/utf8>>, source=[x],
                 postback=#view{render=erlach_settings,target=window,option=show}},
-            #a{class=IntClass, body= <<"О Erlach"/utf8>>, href=erlach_qs:ml(about), postback=erlach_qs:mp(about)},
-            case A of ?UNDEF -> []; _ -> #a{class=IntClass, body= <<"Logout"/utf8>>, postback=#auth{logout=true}} end
+            #a{class=IntClass, body= <<"Инфо"/utf8>>, href=erlach_qs:ml(about), postback=erlach_qs:mp(about)},
+            case A of ?UNDEF -> []; _ -> #a{class=IntClass, body= <<"Выход"/utf8>>, postback=#auth{logout=true}} end
             ]}
     ]}.
-        
-        

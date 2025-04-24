@@ -3,9 +3,23 @@
         <link href='/static/erlach.css' type='text/css' rel='stylesheet'>
         <link href='/static/favicon-512.png' rel='shortcut icon' type="image/png">
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-        <title></title>
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=yes">
+        <title>Erlach Imageboard</title>
     </head>
-    <body class='dark'>
+    <body>
+        <script>
+            function je(e) { return JSON.stringify(e) };
+            function jd(e) { return JSON.parse(e) };
+            function ls(k,v) { try { return v !== undefined ? localStorage.setItem(je(k),je(v)) : jd(localStorage.getItem(je(k))) } catch(e) {} };
+            function applySettings() {
+                var t = ls(['opt','theme']);
+                t && document.body.classList.add(t);
+    
+                var fw = ls(['opt','fullwidth']);
+                fw ? document.body.classList.add('fullwidth') : document.body.classList.remove('fullwidth');
+            };
+            applySettings();
+        </script>
         <header id='header' class='fl cent line-down'>
             <div class='fl page'>
                 <div id='breadcrumbs'></div>
@@ -68,16 +82,23 @@
         <div class='drag'></div>
         <div id='viewer'>
             <div class='viewer-controls fl cent'>
-                <a id='viewer-download' class='b black' target='_blank' download>Download</a>
+                <a id='viewer-download' class='b black' target='_blank' download>Загрузить</a>
                 <a id='viewer-google' class='b black' target='_blank'>Google</a>
                 <a id='viewer-tineye' class='b black' target='_blank'>TinEye</a>
             </div>
-            <div class='fl cent monitor'><div class='media'></div></div>
+            <div class='fl cent monitor'>
+                <div class='image-manage'>
+                    <button type='button' class='control play slim'>Play</button>
+                    <button type='button' class='control pause slim'>❚❚</button>
+                    <button type='button' class='control stop slim'>▲</button>
+                </div>
+                <div class='media'></div>
+            </div>
         </div>
         <div id='settings' class='fl'></div>
         <div id='popup-messages' class='line-up'></div>
         
-        <script>var transition = {pid: '', host: 'localhost', port:'8000'};</script>
+        <script>var transition = {pid: '', host: window.location.hostname, port:'8000'};</script>
         
         <script src='/n2o/protocols/bert.js'></script>
         <script src='/n2o/protocols/client.js'></script>
@@ -90,6 +111,6 @@
         <script src='/n2o/ftp.js'></script>
         <script src='/n2o/validation.js'></script>
         <script src='/static/erlach.js'></script>
-        <script>protos=[$client,$bert];N2O_start();</script>
+        <script> debug=true; protos=[$bert];N2O_start();</script>
     </body>
 </html>

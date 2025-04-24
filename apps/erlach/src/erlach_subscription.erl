@@ -78,7 +78,10 @@ reset(#hes{post=?UNDEF,thread=#post{type=thread,id=Tid}=T,scope=Scope}) ->
     #feed{top=Top,count=Count}=F=case kvs:get(feed,{post,Tid}) of {ok,Fd} -> Fd; _ -> #feed{top=?UNDEF,count=0} end, 
     case erlang:get(key(T)) of
         {ok,thread,{Bid,{PT,PL,PC},{T1,L1,C1}}} ->
-            {ok,#board{}=B}=kvs:get(board,Bid),
+            {ok,B}=case kvs:get(board,Bid) of
+                {ok,#board{}}=X -> X;
+                _ -> wf:warning(?M," reset/1: not found ~p",[{board,Bid}]), fail
+            end,
             Data=case Scope of
                 thread_answers -> {Bid,{PT,L1,PC},{T1,L1,C1}};
                 thread_posts -> {Bid,{T1,PL,C1},{T1,L1,C1}}
@@ -119,7 +122,11 @@ client(#post{type=thread,id=Tid,links=L2}=T,#hes{scope={{Bid,{PT,PL,PC},{T1,L1,C
         end.
 
 render(#post{type=thread,id=Tid,links=L2}=T,#hes{scope=Scope,board=#board{id=Bid}=B}=Hes) ->
-    {ok,#board{urn=BUrn}}=kvs:get(board,Bid),
+    wf:info(?M,"render/thread ~p",[self()]),
+    {ok,#board{urn=BUrn}}=case kvs:get(board,Bid) of
+        {ok,#board{}}=X -> X;
+        _ -> wf:warning(?M," render/2: not found ~p",[{board,Bid}]), fail
+    end,
     #panel{id=panel_id(T,thread),class= <<"element">>,body=[
         #span{class=[b,info],body=[<<"/">>,BUrn,<<"/">>,erlach_qs:id_to_urn(Tid),<<": ">>]},
         render(info,#hes{thread=T,scope=Scope,board=B}),
@@ -128,11 +135,11 @@ render(#post{type=thread,id=Tid,links=L2}=T,#hes{scope=Scope,board=#board{id=Bid
 render(info,#hes{thread=#post{id=Tid,type=thread}=T,scope={{Bid,{PT,PL,PC},{T1,L1,C1}},{DeltaL,DeltaC}},board=B}) ->
     LP=#post{type=post,id=PT,urn=erlach_qs:id_to_urn(case PT of ?UNDEF ->Tid; _ -> PT end)},
     #span{id=panel_id(T,info),body=[
-        #button{class=sea,body=[<<"Replies +"/utf8>>,wf:to_list(DeltaL)], % new answers of thread
-           title= <<"New Replies">>, postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,T}),
+        #button{class=sea,body=[<<"Тред +"/utf8>>,wf:to_list(DeltaL)], % new answers of thread
+           title= <<"Новые ответы на тред"/utf8>>, postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,T}),
                data=#hes{thread=strip(T),scope=thread_answers},from=self()}},
-        #button{class=sea,body=[<<"Posts +"/utf8>>,wf:to_list(DeltaC)], % new posts in thread
-            title= <<"New Posts">>,
+        #button{class=sea,body=[<<"Посты +"/utf8>>,wf:to_list(DeltaC)], % new posts in thread
+            title= <<"Новые посты в треде"/utf8>>,
             postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,LP}),
                 data=#hes{thread=strip(T),scope=thread_posts},from=self()}},
         #button{class=[sea,checked],body=[<<"&#10006;">>],
@@ -161,6 +168,7 @@ pickup_data() -> wf:wire(spa_lambda_event:new(?M,#pubsub{render=?M,target=subscr
 
 api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
     wf:info(?M,"Api Event: subscription",[]),
+    wf:wire("qi('sidebar').innerHTML='';"),
     LsRem=fun(Type,Id) ->
         wf:wire(wf:f("lsrem(['sub','~s',~b]);",[Type,Id]))
     end,
@@ -168,7 +176,7 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             wf:info(?M,"SUB P ~p ~p ~p (~p ~p) (~p ~p)",[Tid,Timestamp,Bid,PT,T1,PC,C1]),
 
             case {kvs:get(board,Bid),kvs:get(post,Tid)} of
-                {{ok,B},{ok,#post{type=thread}=T}} ->
+                {{ok,#board{}=B},{ok,#post{type=thread}=T}} ->
                     erlang:put(key(thread,Tid),{ok,thread,{Bid,{PT,PL,PC},{T1,L1,C1}}}), % TODO: REFACTOR THIS HELL
                     put(T#post{links=L1},#st{board=B}),
                     [Tid|Acc];
@@ -181,7 +189,7 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             wf:info(?M,"SUB P ~p ~p ~p ~p",[Pid,Timestamp,Bid,Tid]),
 
             case {kvs:get(board,Bid),kvs:get(post,Tid),kvs:get(post,Pid)} of
-                {{ok,B},{ok,#post{type=thread}=T},{ok,#post{type=post}=P}} ->
+                {{ok,#board{}=B},{ok,#post{type=thread}=T},{ok,#post{type=post}=P}} ->
                     erlang:put(key(post,Pid),{ok,post,{Bid,Tid,PL,L1}}), % TODO: REFACTOR THIS HELL
                     put(P#post{links=L1},#st{board=B,thread=T}),
                     [Tid|Acc];
@@ -191,5 +199,4 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             end;
         (_,Acc) -> Acc end,TidList1,SubList),
     [ wf:reg({subscription,thread,TX}) || TX <- lists:usort(TidList2)];
-    % wf:info(?M,"SUB ~p ~p",[self(),list()]);
 api_event(Unknown,_,_) -> ?EVENT_ROUTER:unknown(?M,Unknown).

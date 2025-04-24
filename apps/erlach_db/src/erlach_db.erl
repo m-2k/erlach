@@ -34,7 +34,7 @@ metainfo() ->
         ]}.
 
 init_db() ->
-    kvs:count(board) =:= 0, % guard
+    0 =:= kvs:count(board), % guard
     Group=fun(Name,Desc,Boards) ->
         Gid=kvs:next_id(party,1),
         kvs:add(#party{id=Gid,created=erlang:timestamp(),
@@ -127,13 +127,21 @@ init_db() ->
     ]),
     ok.
 
-add_board(eot) -> add_board(9,<<"eot">>,<<"Есть Одна Тян"/utf8>>,<<"Одна из миллиардов"/utf8>>);
-add_board(a) -> add_board(8,<<"Аниме"/utf8>>,<<"a">>,<<"Лунная призма, дай мне силу"/utf8>>).
-add_board(Party,Urn,Name,Desc) ->
+add_board(fap) -> add_board(11,<<"fapfapfapchan.ga">>,<<"Фапчан"/utf8>>,<<"Оверчан всех порнографических досок галактики"/utf8>>,false);
+add_board(rf) -> add_board(9,<<"rf">>,<<"Убежище"/utf8>>,<<"Хиккую как хочу"/utf8>>,true);
+add_board(eot) -> add_board(9,<<"eot">>,<<"Есть Одна Тян"/utf8>>,<<"Одна из миллиардов"/utf8>>,false);
+add_board(a) -> add_board(8,<<"Аниме"/utf8>>,<<"a">>,<<"Лунная призма, дай мне силу"/utf8>>,false).
+add_board(Party,Urn,Name,Desc,Hidden) ->
     kvs:add(#board{id=kvs:next_id(board,1),created=erlang:timestamp(),feed_id={board,Party},
-        name=wf:to_binary(Name),urn=wf:to_binary(Urn),desc=wf:to_binary(Desc)}).
+        name=wf:to_binary(Name),urn=wf:to_binary(Urn),desc=wf:to_binary(Desc),hidden=Hidden=:=true}).
     
 hide_board(N) -> [#board{}=B]=kvs:index(board,urn,wf:to_binary(N)), kvs:put(B#board{hidden=true}).
+
+set_party_type(Id,Type) -> {ok,P}=kvs:get(party,Id), kvs:put(P#party{type=Type}).
+
+update_record(Table,Id,Field,Value) ->
+    {ok,E}=kvs:get(Table,Id),
+    erlach_feeds:update(E,fun(E2) -> {ok,setelement(Field,E2,Value)} end).
 
 % updating all schemas of tables
 update_schema() -> update_schema(undefined).

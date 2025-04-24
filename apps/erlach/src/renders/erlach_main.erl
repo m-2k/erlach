@@ -51,9 +51,9 @@ last_updates() ->
             _ -> []
         end
     end || Tid <- last_threads() ],
-
+    
     #panel{class= <<"last-updates">>,body=[
-        #panel{class=remark,body= <<"Last updates">>},
+        #panel{class=remark,body= <<"Самое свежее, ням"/utf8>>},
         #panel{id=threads,body=Elements}
     ]}.
 
@@ -76,7 +76,6 @@ calculate_last_threads(Count) ->
 
 event(#view{target=sidebar,option=Visibled,element=Btn}=E) ->
     wf:update(Btn,#a{id=Btn,class=case Visibled of true -> [selector,checked]; false -> selector end,
-        body= <<"Notify">>,postback=E#view{option=not Visibled}}),
+        body= <<"Ответы"/utf8>>,postback=E#view{option=not Visibled}}),
     wf:wire(wf:f("qi('sidebar').dataset.visibled=~s;",[Visibled])); % data-* for safari supports
-
 event(Unknown) -> ?EVENT_ROUTER:unknown(?M,Unknown).

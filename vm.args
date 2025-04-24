@@ -1,7 +1,9 @@
 -name erlach@127.0.0.1
+-setcookie xYM2OvNqhg8zjXTSui0leBrBQTvBzsvGYyM56uljlmvdi
 +pc unicode
--setcookie node_runner
 +K true
 +A 5
++c true
++C multi_time_warp
 -env ERL_MAX_PORTS 4096
 -env ERL_FULLSWEEP_AFTER 10

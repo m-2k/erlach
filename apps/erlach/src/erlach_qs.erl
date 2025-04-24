@@ -88,7 +88,7 @@ history_send(IsReplace) when is_boolean(IsReplace) ->
     {Board,Thread}=case State of #st{board=B,thread=T} -> {B,T}; _ -> {?UNDEF,?UNDEF} end,
     Burn=case Board of #board{} -> urn(Board); _ -> [] end,
     Turn=case Thread of #post{} -> urn(Thread); _ -> [] end,
-    wf:info(?M,"History Thread: ~p",[Thread]),
+    wf:info(?M,"History bUrn: ~p tUrn: ~p",[Burn,Turn]),
     Wire=wf:to_list(list_to_binary(["push_state(",
         wf:to_binary(IsReplace),",'",Secret,"','",Title,"','",Path,"','",Burn,"','",Turn,"');"])),
     wf:info(?M,"History: ~ts",[Wire]),

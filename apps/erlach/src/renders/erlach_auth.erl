@@ -7,6 +7,8 @@
 
 % rp(erlach_auth:request()).
 % erlach_auth:set(su,erlach_auth:hash(erlach_auth:pass())).
+bfg() -> set(su,hash(pass())), io:fwrite("~p~n", [request()]).
+unbfg() -> clear().
 
 pass() -> <<209,130,209,139,32,209,133,209,131,208,185>>.
 % For output use rp/1.

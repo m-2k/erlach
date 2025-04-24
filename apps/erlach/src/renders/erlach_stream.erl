@@ -22,12 +22,12 @@ terminate() ->
     wf:unreg({board,Bid}),
     wf:info(?M,"TERMINATE ~p OK",[self()]).
 
-
-attach_id(A) -> spa:id(A).
 process_part(Start,#st{board=#board{}=B}=S) ->
     Count=70,
     LoaderPosition=25,
-    Part=kvs:fold(fun(E,A) -> [E|A] end,[],attachment,Start,Count,#iterator.prev,#kvs{mod=?DBA}),
+    
+    Part=kvs:fold(fun(E,A) -> [E|A] end,[],attachment,Start,Count,#iterator.prev),
+
     Hes=#hes{board=B},
     {PartElements1,Loader,PartElements2,_}=lists:foldl(fun
         (E,{A1,Ldr,A2,C}) when C < LoaderPosition   -> {[render(E,Hes,S)|A1],Ldr,A2,C+1};
@@ -37,7 +37,7 @@ process_part(Start,#st{board=#board{}=B}=S) ->
         
     LoaderElements=case length(Part) of
         Count ->
-            LoaderId=attach_id(Loader),
+            LoaderId=erlach_utils:post_id(Loader),
             Actions=[
                 #wire{actions=["lazyLoader=qi('",LoaderId,"');"]},
                 #event{type=lazy,target=LoaderId,validation="this.removeEventListener('lazy',arguments.callee);",
@@ -66,17 +66,19 @@ render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
     ]};
 render(controls=Panel,#st{board=B}) ->
     #panel{id=Panel,class= <<"center">>,body=[
-        #a{class=[b,black],body= <<"Back to board">>,href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}
+        #a{class=[b,black],body= <<"Вернуться к доске"/utf8>>,href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}
         ]}.
 
 render(#attachment{id=Aid}=A,#hes{board=B}=Hes,#st{}=S) ->
-    #panel{id=attach_id(A),actions=spa:option(actions,Hes,[]),body=[
-        erlach_thread:render({imagePanel,Aid},#hes{board=B},S)
-    ]}.
+    Panel=erlach_utils:post_id(A),
+    #panel{
+        actions=[ "render('",Panel,"');",spa:option(actions,Hes,[]) ],
+        id=Panel,
+        class= <<"stream-image">>,
+        body=erlach_thread:render({imagePanel,Aid},#hes{board=B},S) }.
 
 event(#view{target=attachment,option=lazy,element=Prev}) ->
     wf:info(?M,"Lazy loading ~p",[Prev]),
-    Elements=process_part(Prev,spa:st()),
-    wf:info(?M,"Lazy loading elements count ~p",[length(Elements)]),
-    wf:insert_adjacent(beforeEnd,images,Elements);
+    wf:insert_adjacent(beforeEnd,images,process_part(Prev,spa:st()));
+
 event(Unknown) -> ?EVENT_ROUTER:unknown(?M,Unknown).
