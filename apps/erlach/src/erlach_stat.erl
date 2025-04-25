@@ -6,7 +6,6 @@
 
 count({user,online,total}) ->
     proplists:get_value(active,supervisor:count_children(ranch_server:get_connections_sup(http_erlach)));
-    % wf:f("~p",[supervisor:count_children(ranch_server:get_connections_sup(http_erlach))]);
 count(Thing) -> case kvs:get(id_seq,{anal,Thing}) of {ok,#id_seq{id=Count}} -> Count; _ -> 0 end.
 
 do_incr(Thing) -> do_incr(Thing,1).
@@ -35,7 +34,6 @@ incr(post,Count,{Bid,Tid,#post{type=post,sage=Sage}}) ->
             do_incr({post,sage,board,Bid},Count);
         false -> skip
     end.
-    
 
 ts() -> erlang:monotonic_time(seconds).
 time_start(#st{board=Bd,thread=Th}=S) ->

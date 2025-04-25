@@ -1,6 +1,7 @@
 <html>
     <head>
         <link href='/static/erlach.css' type='text/css' rel='stylesheet'>
+        <link href='/static/erlach-pink.css' type='text/css' rel='stylesheet'>
         <link href='/static/favicon-k.png' rel='shortcut icon' type="image/png">
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
         <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=yes">
@@ -15,19 +16,21 @@
                 else { var x = jd(localStorage.getItem(je(k))); return x === null ? false : x; } 
             } catch(e) {} };
             function applySettings() {
-                
                 var selector = function(opt,values) {
                     var lo = ls(['opt',opt]) || values[0];
                     ls(['opt',opt],lo);
                     DOMTokenList.prototype.remove.apply(document.body.classList, values);
                     lo && document.body.classList.add(lo);
                 }
-                
-                selector('theme',['dark','light']);
-                selector('language',['en','ru']);
+                selector('theme',['pink','dark','light']);
+                selector('language',['en','ru','ua']);
     
-                var fw = ls(['opt','fullwidth']);
-                fw ? document.body.classList.add('fullwidth') : document.body.classList.remove('fullwidth');
+                var checkbox = function(opt) {
+                    var lo = ls(['opt',opt]);
+                    lo ? document.body.classList.add(opt) : document.body.classList.remove(opt);
+                }
+                checkbox('fullwidth');
+                checkbox('nsfw');
                 
                 typeof snow !== 'undefined' && snow();
             };
@@ -35,6 +38,9 @@
         </script>
         <header id='header' class='fl cent line-down'>
             <div class='fl page'>
+                <input id='search-checkbox' type='checkbox'>
+                <input id='search-text' type='text' placeholder='Live search' class='xl'>
+                <button id='search-go'>Go</button>
                 <div id='breadcrumbs'></div>
                 <a id='erlach-logo' href='/'>
                     <svg width="100px" height="20px" viewBox="-2 0 284 50" version="1.1"
@@ -86,12 +92,29 @@
         <div id='snow-area'><canvas id='snow-canvas' resize='true'></canvas></div>
         <div id='sidebar'></div>
         <div id='main'>
+            <div id='search-content'></div>
             <div id='content'></div>
         </div>
         <footer id='footer'></footer>
         <div id='up-down-navigation'>
-            <div id='move-up' onclick='scrollToTop();'>⬆</div>
-            <div id='move-down' onclick='scrollToBottom();'>⬇</div>
+            <div id='move-up' onclick='scrollToTop();'>
+                <svg width="42px" height="44px" viewBox="0 0 42 44" version="1.1"
+                    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                        <path d="M16.424,35.984 L25.576,35.984 L25.576,19.28 L32.744,19.28 L21,7.312 L9.256,19.28 L16.424,19.28 L16.424,35.984 Z">
+                        </path>
+                    </g>
+                </svg>
+            </div>
+            <div id='move-down' onclick='scrollToBottom();'>
+                <svg width="42px" height="44px" viewBox="0 0 42 44" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                        <path d="M16.6681406,35.984 L25.8201406,35.984 L25.8201406,19.28 L32.9881406,19.28 L21.2441406,7.312 L9.50014062,19.28 L16.6681406,19.28 L16.6681406,35.984 Z"
+                            transform="translate(21.244141, 21.648000) rotate(-180.000000) translate(-21.244141, -21.648000) ">
+                        </path>
+                    </g>
+                </svg>
+            </div>
         </div>
         <div class='face'></div>
         <div class='drag'></div>
@@ -100,6 +123,7 @@
                 <a id='viewer-download' class='b black' target='_blank' download>
                     <span class='ru'>Скачать</span>
                     <span class='en'>Download</span>
+                    <span class='ua'>Завантажити</span>
                 </a>
                 <a id='viewer-google' class='b black' target='_blank' title='images.google.com'>G</a>
                 <a id='viewer-tineye' class='b black' target='_blank' title='tineye.com'>T</a>
@@ -117,9 +141,66 @@
             </div>
         </div>
         <div id='settings' class='fl'></div>
+        <div id='input-helper' class='fl modal-window'>
+            <div class="modal-window-controls">
+                <h5 class='modal-window-item'>
+                    <span class="ru">Разметка</span>
+                    <span class="en">Marking</span>
+                    <span class="ua">Розмітка</span>
+                </h5>
+                <div class='modal-window-item fl'>
+                    <span>&gt;&gt;/b/</span>
+                    <strong>→</strong>
+                    <span><a class="link" title="/Б/ред – b" href="/b">&gt;&gt;/b/</a></span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>**Bold**</span>
+                    <strong>→</strong>
+                    <span class='strong'>Bold</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>*Italic*</span>
+                    <strong>→</strong>
+                    <span class='italic'>Italic</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>&gt;Citate</span>
+                    <strong>→</strong>
+                    <span class='citate'>&gt;Citate</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>%%Spoiler%%</span>
+                    <strong>→</strong>
+                    <span><span class='spoiler'>Spoiler</span></span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>Strikeout^W</span>
+                    <strong>→</strong>
+                    <span class='strikeout'>Strikeout</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>`Inline Code`</span>
+                    <strong>→</strong>
+                    <span class="code hljs nginx"><span class="hljs-attribute">Inline</span> Code</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span><span>```<br>Multiline<br>Code<br>```</span></span>
+                    <strong>→</strong>
+                    <span class="code-multi hljs">Multiline<br>Code</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>````erlang<br>fun Multiline(Erlang) -&gt;<br>&nbsp;&nbsp;Code<br>end.<br>```</span>
+                    <strong>→</strong>
+                    <span class="code-multi erlang hljs"><span class="hljs-keyword">fun</span> Multiline(Erlang) -&gt;<br>&nbsp;&nbsp;Code<br>end.</span>
+                </div>
+                <button type="button" onclick="inputHelper(false);">
+                    <span class="ru">Понял</span><span class="en">OK</span><span class="ua">Ясно</span>
+                </button>
+            </div>
+        </div>
         <div id='popup-messages' class='line-up'></div>
         
-        <script>var transition = {pid: '', host: window.location.hostname, port:'8000'};</script>
+        <script>var transition = {pid: '', host: location.hostname, port: location.port || (location.protocol==='https:'?'443':'80')};</script>
         
         <script src='/n2o/protocols/bert.js'></script>
         <script src='/n2o/protocols/client.js'></script>
@@ -131,6 +212,7 @@
         <script src='/n2o/n2o.js'></script>
         <script src='/n2o/ftp.js'></script>
         <script src='/n2o/validation.js'></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/highlight.min.js"></script>
         <script src='/static/erlach.js'></script>
         <script> debug=true; protos=[$bert];N2O_start();</script>
     </body>

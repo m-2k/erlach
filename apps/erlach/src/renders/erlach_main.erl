@@ -62,10 +62,9 @@ last_updates() ->
         end;
         (_,Acc) -> Acc
     end,[],last_threads()),
-
+    
     #panel{class= <<"last-updates">>,body=[
-        #panel{class=remark,body=[#span{class=ru,body= <<"Самое свежее, ням"/utf8>>},
-                #span{class=en,body= <<"Latest news, yum"/utf8>>} ] },
+        #panel{class=remark,body=?TR(<<"Самое свежее, ням"/utf8>>,<<"Latest news, yum"/utf8>>,<<"Найсвіжіше"/utf8>>) },
         #panel{id=threads,body=lists:reverse(Elements)}
     ]}.
 
@@ -88,7 +87,8 @@ calculate_last_threads(Count) ->
 event(#view{target=sidebar,option=Visibled,element=Btn}=E) ->
     wf:update(Btn,#a{id=Btn,class=case Visibled of true -> [selector,checked]; false -> selector end,
         body=[ #span{class=ru,body= <<"Ответы"/utf8>>},
-            #span{class=en,body= <<"Replies"/utf8>>} ],
+            #span{class=en,body= <<"Replies"/utf8>>},
+            #span{class=ua,body= <<"Повідомлення"/utf8>>} ],
         postback=E#view{option=not Visibled}}),
     wf:wire(wf:f("qi('sidebar').dataset.visibled=~s;",[Visibled])); % data-* for safari supports
 

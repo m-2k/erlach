@@ -1,1 +1,1 @@
-[kernel,stdlib,fs,ranch,asn1,crypto,inets,gproc,mnesia,metamodule,cowlib,kvs,public_key,erlach_db,ssl,cowboy,n2o,erlach,active,eauth,gen_smtp,jsone,mad,nitro,sh,spa,syn,ux]
+[kernel,stdlib,fs,ranch,asn1,crypto,inets,gproc,mnesia,metamodule,cowlib,public_key,kvs,erlach_db,ssl,cowboy,n2o,erlach,active,eauth,ecod,fulltext_search,gen_smtp,jsone,kvs_feeds,mad,nitro,sh,spa,syn,ux]

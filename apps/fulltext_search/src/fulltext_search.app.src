@@ -1,0 +1,9 @@
+{application, fulltext_search,
+  [
+    {description, "Simple Full-Text Search Engine"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib, kvs]},
+    {mod, { fulltext_search, []}},
+    {env, []}
+  ]}.

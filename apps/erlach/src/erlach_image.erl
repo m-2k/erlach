@@ -45,7 +45,7 @@ destination(Source,Storage,Path,Info) ->
 
 start(Group) -> restart(Group).
 restart(Group) ->
-    wf:info(?M,"Convert supervisor starting...",[]),
+    wf:warning(?M,"Convert supervisor starting...",[]),
     case n2o_async:stop(?SUP_CLASS,Group) of
         #handler{}=H -> n2o_async:start(H);
         _ -> n2o_async:start(#handler{module=?M,group=?APP,class=?SUP_CLASS,name=Group,state=#state{}})
@@ -87,12 +87,21 @@ check_file(Path) ->
 stage(#entry{infoA=#jpeg{},stage=starting,source=SP,destination=DP}=E) ->
     Mem=wf:to_binary(wf:config(erlach,jpegtran_maxmemory,524288)),
     Cmd=["jpegtran -copy none -optimize -maxmemory ",Mem," -outfile ",DP," ",SP],
-    {ok, Cmd, E#entry{stage=finishing}};
+    {ok, Cmd, E#entry{stage=preview}};
 stage(#entry{infoA=#png{},stage=starting,source=SP,destination=DP}=E) ->
     Options=wf:config(erlach,optipng_opts,"-zc9 -zm8 -zs0 -f0 -nb -nc -np -nx -fix"),
-    {ok, ["optipng ",Options," -out ",DP," ",SP], E#entry{stage=finishing}};
-stage(#entry{infoA=#gif{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
-stage(#entry{infoA=#bpg{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}}.
+    {ok, ["optipng ",Options," -out ",DP," ",SP], E#entry{stage=preview}};
+stage(#entry{infoA=#gif{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=preview}};
+stage(#entry{infoA=#bpg{},stage=starting,source=SP,destination=DP}=E) -> {ok, ["mv ",SP," ",DP], E#entry{stage=finishing}};
+stage(#entry{infoA=Info,stage=preview,destination=DP}=E) ->
+    DLen=erlach_utils:char_length(DP),
+    LExt=erlach_utils:char_length(ext(Info)),
+    DPR=lists:sublist(erlach_utils:utf8_to_list(DP),DLen-LExt),
+    Cmd=["convert ",DP," -background white -flatten ",
+        "\\( -clone 0 -thumbnail 512x512 -unsharp 1x.3 -write ",DPR,"-R512.jpg +delete \\) ",
+        "\\( -clone 0 -thumbnail 256x256 -unsharp 1x.4 -write ",DPR,"-R256.jpg \\) ",
+        "+clone -delete 0-1 -thumbnail 128x128 -unsharp 1x.6 ",DPR,"-R128.jpg"],
+    {ok, Cmd, E#entry{stage=finishing}}.
 
 spawn_external(#entry{id=Key}=E,#state{entry_map=EM,port_map=PM}=S) ->
     wf:info(?M,"(~p) Spawning for ~p",[self(),Key]),
@@ -300,8 +309,8 @@ image_info(<<255,216,Data/binary>>) -> % jpeg
         end
     end,
     Foreach(0);
-image_info(<<137,80,78,71,13,10,26,10,IHDR:25/binary,_/binary>>) -> % png
-    <<0,0,0,13,73,72,68,82,Data:13/binary,_CRC:4/binary>>= IHDR,
+image_info(<<137,80,78,71,13,10,26,10,IHDR:25/binary,ChunkList/binary>>) -> % png / apng
+    <<0,0,0,13,73,72,68,82,Data:13/binary,_CRC:32>>= IHDR,
     <<W:32/big,H:32/big,Depth:8,Color:8,_Compression:8,_Filter:8,_Interlace:8>>=Data,
     {ColorType,Alpha}=case Color of
         0 -> {greyscale,false};
@@ -310,7 +319,13 @@ image_info(<<137,80,78,71,13,10,26,10,IHDR:25/binary,_/binary>>) -> % png
         4 -> {grayscale,true};
         6 -> {truecolor,true}
     end,
-    {ok,#png{width=W,height=H,bit_depth=Depth,color_type=ColorType,alpha=Alpha}};
+    <<Size:32,Type:4/binary,Payload:Size/binary,CRC:32,ChunkList2/binary>> = ChunkList,
+    Animation = case {Type,Payload} of
+        {<<"acTL">>,<<NumFrames:32,NumPlays:32>>} -> true;
+        _ -> false
+    end,
+    {ok,#png{width=W,height=H,bit_depth=Depth,color_type=ColorType,alpha=Alpha,animation=Animation}};
+
 % http://www.w3.org/Graphics/GIF/spec-gif89a.txt
 % http://giflib.sourceforge.net/whatsinagif/bits_and_bytes.html
 % http://www.onicos.com/staff/iz/formats/gif.html
@@ -403,3 +418,7 @@ image_info(<<16#425047fb:32,PF:3/big,A1:1,BD:4/big,CS:4/big,E:1,A2:1,LR:1,AN:1,D
         _ -> {error,bpg_wrong_data}
     end;
 image_info(_) -> {error,unknown_image_format}.
+
+test_apng() ->
+    Path= <<"/tmp/image-with-alpha-channel.png">>,
+    image_info_file(Path).

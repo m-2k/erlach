@@ -9,8 +9,8 @@ urn() -> <<"stream">>.
 
 init(#route{board=Burn}=Route) ->
     wf:info(?M,"init",[]),
-    case kvs:index(board,urn,Burn) of
-        [#board{id=Bid}=B] ->
+    case erlach_board:get_board(Burn) of
+        #board{id=Bid}=B ->
             wf:reg({board,Bid}),
             {ok,#st{user=eauth_user:get(),route=Route,action=view,board=B}};
         _ -> {redirect,erlach_qs:mp(main)}
@@ -21,6 +21,22 @@ terminate() ->
     #st{board=#board{id=Bid}}=spa:st(),
     wf:unreg({board,Bid}),
     wf:info(?M,"TERMINATE ~p OK",[self()]).
+
+test() ->
+    Count=70,
+    LoaderPosition=25,
+    Part=kvs:fold(fun(E,A) -> [E|A] end,[],attachment,3692,Count,#iterator.prev),
+    wf:warning(?M,"[DEBUG] Part: ~p",[[ element(2,E) || E <- Part]]),
+    {PartElements1,Loader,PartElements2,_}=lists:foldl(fun
+        (E,{A1,Ldr,A2,C}) when C < LoaderPosition   -> {[{render,element(2,E)}|A1],Ldr,A2,C+1};
+        (E,{A1,Ldr,A2,C}) when C =:= LoaderPosition -> {A1,{element,element(2,E)},A2,C+1};
+        (E,{A1,Ldr,A2,C}) when C > LoaderPosition   -> {A1,Ldr,[{render,element(2,E)}|A2],C+1}
+    end,{[],[],[],1},Part),
+    LoaderElements=case length(Part) of
+        Count -> {render_loader};
+        _ -> []
+    end,
+    [PartElements1,LoaderElements,PartElements2].
 
 process_part(Start,#st{board=#board{}=B}=S) ->
     Count=70,
@@ -37,7 +53,7 @@ process_part(Start,#st{board=#board{}=B}=S) ->
         
     LoaderElements=case length(Part) of
         Count ->
-            LoaderId=erlach_utils:post_id(Loader),
+            LoaderId=erlach_utils:post_id(Loader),%attach_id(Loader),
             Actions=[
                 #wire{actions=["lazyLoader=qi('",LoaderId,"');"]},
                 #event{type=lazy,target=LoaderId,validation="this.removeEventListener('lazy',arguments.callee);",
@@ -46,13 +62,15 @@ process_part(Start,#st{board=#board{}=B}=S) ->
             render(Loader,spa:setoption(actions,Actions,Hes),S);
         _ -> []
     end,
-    [PartElements1,LoaderElements,PartElements2].
+    [PartElements2,LoaderElements,PartElements1].
 
 render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
     wf:info(?M,"Board: ~p",[Bid]),
     
     Elements=case kvs:get(feed,{attachment,Bid}) of
-        {ok,#feed{top=Top}} -> process_part(Top,S);
+        {ok,#feed{top=Top}} ->
+            wf:warning(?M,"DEBUG: top:~p",[Top]),
+            process_part(Top,S);
         _ -> []
     end,
         
@@ -67,10 +85,11 @@ render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
 render(controls=Panel,#st{board=B}) ->
     #panel{id=Panel,class= <<"center">>,body=[
         #a{class=[b,black],body=
-            ?TR(<<"Вернуться к доске"/utf8>>,<<"Back to board"/utf8>>),
+            ?TR(<<"Вернуться к доске"/utf8>>,<<"Back to board"/utf8>>,<<"Повернутися на дошку"/utf8>>),
             href=erlach_qs:ml({board,B}),postback=erlach_qs:mp({board,B})}
         ]}.
 
+render(#attachment{thread=?UNDEF,post=?UNDEF},#hes{},#st{}) -> [];
 render(#attachment{id=Aid}=A,#hes{board=B}=Hes,#st{}=S) ->
     Panel=erlach_utils:post_id(A),
     #panel{

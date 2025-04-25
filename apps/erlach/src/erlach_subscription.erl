@@ -98,7 +98,6 @@ client(#post{type=post,id=Pid}=P,#hes{option=reset}) ->
     case spa:eternal_id_exist(Key) of
         true ->
             spa:eternal_id_erase(Key),
-            % wf:wire(wf:f("lsrem(['sub','p',~b]);",[Pid])),
             wf:remove(Panel);
         false -> skip
     end;
@@ -135,10 +134,10 @@ render(#post{type=thread,id=Tid,links=L2}=T,#hes{scope=Scope,board=#board{id=Bid
 render(info,#hes{thread=#post{id=Tid,type=thread}=T,scope={{Bid,{PT,PL,PC},{T1,L1,C1}},{DeltaL,DeltaC}},board=B}) ->
     LP=#post{type=post,id=PT,urn=erlach_qs:id_to_urn(case PT of ?UNDEF ->Tid; _ -> PT end)},
     #span{id=panel_id(T,info),body=[
-        #button{class=sea,body=[?TR(<<"Тред"/utf8>>,<<"Th.">>),"+",wf:to_list(DeltaL)], % new answers of thread
+        #button{class=sea,body=[?TR(<<"Тред"/utf8>>,<<"Th.">>,<<"Тред"/utf8>>),"+",wf:to_list(DeltaL)], % new answers of thread
            title= <<"Новые ответы на тред"/utf8>>, postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,T}),
                data=#hes{thread=strip(T),scope=thread_answers},from=self()}},
-        #button{class=sea,body=[?TR(<<"Посты"/utf8>>,<<"Posts">>)," +",wf:to_list(DeltaC)], % new posts in thread
+        #button{class=sea,body=[?TR(<<"Посты"/utf8>>,<<"Posts">>,<<"Пости"/utf8>>)," +",wf:to_list(DeltaC)], % new posts in thread
             title= <<"Новые посты в треде"/utf8>>,
             postback=#pubsub{render=?M,target=subscription,action=view,element=erlach_qs:mp({post,B,T,LP}),
                 data=#hes{thread=strip(T),scope=thread_posts},from=self()}},
@@ -174,7 +173,6 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
     end,
     TidList1=lists:foldl(fun({{<<"t">>,Tid},{Timestamp,Bid,PT,[PL],PC,T1,[L1],C1}},Acc) ->
             wf:info(?M,"SUB P ~p ~p ~p (~p ~p) (~p ~p)",[Tid,Timestamp,Bid,PT,T1,PC,C1]),
-
             case {kvs:get(board,Bid),kvs:get(post,Tid)} of
                 {{ok,#board{}=B},{ok,#post{type=thread}=T}} ->
                     erlang:put(key(thread,Tid),{ok,thread,{Bid,{PT,PL,PC},{T1,L1,C1}}}), % TODO: REFACTOR THIS HELL
@@ -199,4 +197,5 @@ api_event(#pubsub{target=subscription,action=pickup},[SubList],_State) ->
             end;
         (_,Acc) -> Acc end,TidList1,SubList),
     [ wf:reg({subscription,thread,TX}) || TX <- lists:usort(TidList2)];
-api_event(Unknown,_,_) -> ?EVENT_ROUTER:unknown(?M,Unknown).
+api_event(Unknown,_,_) ->
+    ?EVENT_ROUTER:unknown(?M,Unknown).

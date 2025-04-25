@@ -27,6 +27,10 @@ port()     -> [ { port, wf:config(erlach,port,8000)  } ].
 all()      -> {priv_file, erlach, "static/erlach.html"}.
 services() -> {priv_file, erlach, "static/services.html"}.
 services_test() -> {priv_file, erlach, "static/services-test.html"}.
+file_bpgdec() ->
+    {ok, Dir} = file:get_cwd(),
+    filename:join(Dir, "deps/bpg_ww/bpgdec8a-ww.min.js").
+
 
 points(prod) -> cowboy_router:compile([{'_', [
     {"/ws/[:q1/[:q2/[:q3/[:q4]]]]", n2o_stream,    [] }
@@ -34,6 +38,7 @@ points(prod) -> cowboy_router:compile([{'_', [
 points(_) -> cowboy_router:compile([{'_', [
     {"/messages/[...]",             cowboy_static, services_test() },
     {"/services/[...]",             cowboy_static, services() },
+    {"/static/bpgdec.js",           cowboy_static, {file, file_bpgdec()} },
     {"/static/[...]",               n2o_static,    static() },
     {"/n2o/[...]",                  n2o_static,    n2o() },
     {"/ws/[:q1/[:q2/[:q3/[:q4]]]]", n2o_stream,    [] },

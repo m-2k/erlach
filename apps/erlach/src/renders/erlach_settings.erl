@@ -8,7 +8,7 @@ render(settings=Panel) ->
     #panel{id=Panel,class=fl,body=#panel{class= <<"settings-controls">>,body=[
     
         #panel{class= <<"setting-option">>,body=[
-            #span{class= <<"opt-title opt-name">>,body=?TR(<<"Имя"/utf8>>,<<"Name"/utf8>>)},
+            #span{class= <<"opt-title opt-name">>,body=?TR(<<"Имя"/utf8>>,<<"Name"/utf8>>,<<"Ім\\'я"/utf8>>)},
             #textbox{id= <<"option-nickname">>,maxlength=wf:config(erlach,nickname_length,14),
                 placeholder= <<"Аноним"/utf8>>,autofocus=autofocus,disabled=true}
         ]},
@@ -16,40 +16,47 @@ render(settings=Panel) ->
             #span{class= <<"opt-title">>,body= <<"Language"/utf8>>},
             #dropdown{id= <<"option-language">>,title= <<"Select u\\'r language">>,
                 options=[
-                    #option{value= <<"ru">>,label= <<"Russian"/utf8>>,selected=true},
-                    #option{value= <<"en">>,label= <<"English"/utf8>>,selected=false}
+                    #option{value= <<"ru">>,label= <<"Русский"/utf8>>,selected=true},
+                    #option{value= <<"en">>,label= <<"English"/utf8>>,selected=false},
+                    #option{value= <<"ua">>,label= <<"Українська"/utf8>>,selected=false}
                 ]}
         ]},
         #panel{class= <<"setting-option">>,body=[
             #checkbox{id= <<"option-fullwidth">>,body=?TR(
                 <<"Растянуть по ширине окна"/utf8>>,
-                <<"Fullwidth page mode">>)}
+                <<"Fullwidth page mode">>,
+                <<"Розтягнути по ширині вікна"/utf8>>)}
         ]},
         #panel{class= <<"setting-option">>,body=[
             #checkbox{id= <<"option-no-cacach">>,body=?TR(
                 <<"Не отправлять данные о новых тредах на 1chan.ca"/utf8>>,
-                <<"Don\\'t send data of the new thread to 1chan.ca"/utf8>>)}
+                <<"Don\\'t send data of the new thread to 1chan.ca"/utf8>>,
+                <<"Не відправляти дані про нові треди на 1сhan.ca"/utf8>>)}
         ]},
         #panel{class= <<"setting-option">>,body=[
             #checkbox{id= <<"option-no-soundcloud">>,body=?TR(
                 <<"Не загружать плеер с soundcloud.com"/utf8>>,
-                <<"Don\\'t load audio player from soundcloud.com"/utf8>>)}
+                <<"Don\\'t load audio player from soundcloud.com"/utf8>>,
+                <<"Не загружати плеєр з soundcloud.com"/utf8>>)}
         ]},
         #panel{class= <<"setting-option">>,body=[
             #checkbox{id= <<"option-snow">>,body=?TR(
                 <<"Снег"/utf8>>,
-                <<"Snow"/utf8>>)}
+                <<"Snow"/utf8>>,
+                <<"Сніг"/utf8>>)}
         ]},
         #panel{class= <<"setting-option">>,body=[
-            #span{class= <<"opt-title">>,body=?TR(<<"Тема"/utf8>>,<<"Theme"/utf8>>)},
-            #dropdown{id= <<"option-theme">>,title=?TR(<<"Выбери тему"/utf8>>,<<"Select theme"/utf8>>),
+            #span{class= <<"opt-title">>,body=?TR(<<"Тема"/utf8>>,<<"Theme"/utf8>>,<<"Тема"/utf8>>)},
+            #dropdown{id= <<"option-theme">>,title=?TR(<<"Выбери тему"/utf8>>,<<"Select theme"/utf8>>,<<"Вибери тему"/utf8>>),
                 options=[
-                    #option{value= <<"dark">>,label= <<"Северное сияние / Northern Lights"/utf8>>,selected=false},
-                    #option{value= <<"light">>,label= <<"Нейтронная звезда / Neutron Star"/utf8>>,selected=true}
+                    #option{value= <<"dark">>,label= <<"Северное сияние / Northern Lights"/utf8>>,selected=true},
+                    #option{value= <<"light">>,label= <<"Нейтронная звезда / Neutron Star"/utf8>>,selected=false},
+                    #option{value= <<"pink">>,label= <<"Розовая дыра / Pink hole"/utf8>>,selected=false}
                 ]}
         ]},
         
-        #button{body=?TR(<<"Готово"/utf8>>,<<"Done"/utf8>>),postback=#view{render=erlach_settings,target=window,option=hide}}
+        #button{body=?TR(<<"Готово"/utf8>>,<<"Done"/utf8>>,<<"Готово"/utf8>>),
+            postback=#view{render=erlach_settings,target=window,option=hide}}
     ]},actions=[
         "loadSettings();",
         #bind{target= <<"option-theme">>,type=change,postback= <<"saveSettings();">>}

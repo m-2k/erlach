@@ -44,21 +44,25 @@ render_element(#media_input{id=Id,image=ImId,target=Target,disabled=Disabled}) w
     Controls=#panel{class= <<"input-controls center">>,body=[
         #button{id=Store,class=[ClassStore,<<"store-button">>],disabled=Disabled,body=[
                 #span{class=ru,body= <<"Отправить"/utf8>>},
-                #span{class=en,body= <<"Send"/utf8>>} ]},
+                #span{class=en,body= <<"Send"/utf8>>},
+                #span{class=ua,body= <<"Відправити"/utf8>>} ]},
         case Target of
             thread -> #button{class=Class,body=[
                     #span{class=ru,body= <<"Отмена"/utf8>>},
-                    #span{class=en,body= <<"Cancel"/utf8>>} ],
+                    #span{class=en,body= <<"Cancel"/utf8>>},
+                    #span{class=ua,body= <<"Скасувати"/utf8>>} ],
                 postback=#cancel{target=input,panel=Panel}};
             post ->
                 #button{id=Sage,class=[Class,<<"sage-button">>],body=[
                         #span{class=ru,body= <<"Сажи"/utf8>>},
-                        #span{class=en,body= <<"Sage"/utf8>>} ],
+                        #span{class=en,body= <<"Sage"/utf8>>},
+                        #span{class=ua,body= <<"Сажи"/utf8>>} ],
                     postback=#render_event{target=input,event={sage,true,Sage}},value=false}
         end,
         #button{id=AddImage,class=Class,body=[
                 #span{class=ru,body= <<"Картинка"/utf8>>},
-                #span{class=en,body= <<"Image"/utf8>>} ],
+                #span{class=en,body= <<"Image"/utf8>>},
+                #span{class=ua,body= <<"Зображення"/utf8>>} ],
             onclick=wf:jse(wf:f("qi('~s').click();",[AddImageInput]))},
         #input{id=AddImageInput,type=file}
         ]},
@@ -66,11 +70,15 @@ render_element(#media_input{id=Id,image=ImId,target=Target,disabled=Disabled}) w
     ImageControls=#panel{class= <<"image-manage">>,body=[
         #label{for=Selector,class=["control-thumb",l,sea,checked],body=[
             #span{class=ru,body= <<"Формат"/utf8>>},
-            #span{class=en,body= <<"Stretch"/utf8>>} ]}
+            #span{class=en,body= <<"Stretch"/utf8>>},
+            #span{class=ua,body= <<"Формат"/utf8>>} ]}
     ]},
     III=[
         #input{id=Selector,type= <<"checkbox">>,class= <<"input-selector">>,postback=?UNDEF},
         case Target of thread -> Controls; _ -> [] end,
+        #panel{class= <<"post-manage">>,body=[
+            #button{class= <<"l lemon info-action">>,onclick="inputHelper(true);",body= <<"i"/utf8>>}
+        ]},
         #panel{class= <<"post-content">>,body=[
             #panel{class= <<"post-flash">>,body=[
                 image_panel(Image,empty,false,?UNDEF,?UNDEF,[],?UNDEF,?UNDEF,ImageControls),
@@ -78,10 +86,13 @@ render_element(#media_input{id=Id,image=ImId,target=Target,disabled=Disabled}) w
                     thread -> #panel{id=Topic,class= <<"post-topic single-line">>,
                         data_fields=[
                             {placeholder,<<"С чем пожаловал, ананас?"/utf8>>},
-                            {'placeholder-en',<<"What happened, anon?"/utf8>>}]};
+                            {'placeholder-en',<<"What happened, anon?"/utf8>>},
+                            {'placeholder-ua',<<"З чим завітав, ананас?"/utf8>>}]};
                     post -> [] end,
                 #panel{id=Input,class= <<"post-message">>,
-                    data_fields=[{placeholder,<<"Сообщение…"/utf8>>},{'placeholder-en',<<"Message…"/utf8>>}]}
+                    data_fields=[{placeholder,<<"Сообщение…"/utf8>>},
+                        {'placeholder-en',<<"Message…"/utf8>>},
+                        {'placeholder-ua',<<"Повідомлення…"/utf8>>} ]}
             ]}
         ]},
         case Target of thread -> []; post -> Controls end

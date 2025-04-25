@@ -10,8 +10,8 @@ urn() -> ?URN_PAGE_DYNAMIC.
 
 init(#route{board=Burn,thread=Turn,post=Purn}=Route) ->
     wf:info(?M,"init ~p ~p ~p",[Burn,Turn,Purn]),
-    case {kvs:index(board,urn,Burn),kvs:get(post,erlach_qs:urn_to_id(Turn))} of
-        {[#board{id=Bid}=B],{ok,#post{type=thread,feed_id={thread,Bid},id=Tid}=T}} ->
+    case {erlach_board:get_board(Burn),kvs:get(post,erlach_qs:urn_to_id(Turn))} of
+        {#board{id=Bid}=B,{ok,#post{type=thread,feed_id={thread,Bid},id=Tid}=T}} ->
             wf:reg({board,Bid}),
             wf:reg({thread,Tid}),
             P=case Purn of
@@ -27,7 +27,6 @@ init(#route{board=Burn,thread=Turn,post=Purn}=Route) ->
     end.
 finalize(#st{thread=#post{id=Tid},route=#route{option=highlight}}) ->
     wf:info(?M,"finalize with option (~p)",[self()]),
-    % scroll_to(Tid);
     [{scroll,Tid},{wait_finalize,true}];
 finalize(#st{post=P}) ->
     wf:info(?M,"finalize (~p)",[self()]),
@@ -67,13 +66,8 @@ load_actions(#view{}=View) ->
     [list_to_binary(["{ setTimeout(function() { ",E," },20) }"])];
 load_actions(_) -> "var x=qs('#input .input-controls [disabled]');x&&x.removeAttribute('disabled');finalize();".
 
+
 render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
-    
-    Start=case kvs:entries(kvs:get(feed,{post,Tid}),post,undefined) of
-        [] -> ?UNDEF;
-        List -> element(2,hd(List))
-    end,
-    
     Container= <<"posts">>,
     View=#view{target=post,
         element=Container,
@@ -81,8 +75,7 @@ render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
         partial=true,
         table=post,
         feed={post,Tid},
-        start=Start,
-        count=wf:config(erlach,db_fold_count,70),
+        count=wf:config(erlach,db_fold_count_first,3),
         direction=next },
     
     {Instant,View2}=erlach_utils:partial(View),
@@ -94,16 +87,18 @@ render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
             "x(qi('content')); x(qi('viewer'));"
         ]}
     end,
+    
+    View3=case View2 of #view{} -> View2#view{count=wf:config(erlach,db_fold_count,70)}; _ -> View2 end,
 
     #panel{id=Panel,
-        actions=[ FilterAction, load_actions(View2) ],
+        actions=[ FilterAction, load_actions(View3) ],
         body=[
             #panel{class= <<"content-title">>,body=topic(T)},
             render(T,#hes{board=B},S),
             #panel{id=Container,body=lists:foldl(fun(P,A) -> [render(P,#hes{thread=T,board=B},S)|A] end,[],Instant)},
             #panel{id= <<"posts-new">>},
             render('posts-new-controls',S),
-            case is_read_only(S) of true -> []; false -> #media_input{id=input,target=post,disabled=true} end
+            case is_archived(S) of true -> []; false -> #media_input{id=input,target=post,disabled=true} end
         ]};
 
 render('posts-new-controls'=Panel,#st{}) ->
@@ -149,11 +144,11 @@ render({imagePanel,Aid},#hes{board=B},#st{}=S) ->
     end,
     case kvs:get(attachment,Aid) of
         {ok,#attachment{path=?UNDEF,name=UploadName,view=View,width=JsWidth,height=JsHeight}=A} -> % deferred
-            ImPanelId=image_panel_id(UploadName),
+            ImPanelId=erlach_utils:image_panel_id(UploadName,S),
             element_media_input:image_panel(ImPanelId,Class(View),true,JsWidth,JsHeight,
                 Fields(A),?UNDEF,?UNDEF,ImageControls(ImPanelId,?UNDEF));
         {ok,#attachment{path=Path,name=Name,view=View,width=Width,height=Height,info=Info}=A} ->
-            ImPanelId=image_panel_id(Name),
+            ImPanelId=erlach_utils:image_panel_id(Name,S),
             element_media_input:image_panel(ImPanelId,Class(View),true,Width,Height,
                 Fields(A),url(A),erlach_image:type(Info),ImageControls(ImPanelId,Info));
         _ -> wf:warning(?M,"Attachment db record not found ~p",[Aid]), []
@@ -183,7 +178,6 @@ render({'post-manage',#post{id=Id,created=Ts,type=Type}=P},#hes{}=Hes,#st{access
         #panel{class=time,data_fields=[{<<"data-ts">>,UTC}] }, % ,actions=["render_time('",Panel,"');"] }
         #panel{class=pid}
     ]};
-
 render(message,#hes{post=#post{message=Raw,message_escaped=Esc}=P}=Hes,#st{}=S) ->
     erlach_markup:html(P,Hes,S);
 
@@ -221,7 +215,7 @@ render(#post{type=thread,id=Tid,urn=Urn,links=Links,message_escaped=Message,imag
                         render(message,#hes{post=T},S)
                     ]},
                     render(links,#hes{post=T},S),
-                    #panel{class= <<"hidden-info">>,body= <<"Скрыто"/utf8>>}
+                    #panel{class= <<"hidden-info">>,body=?TR(<<"Скрыто"/utf8>>,<<"Hidden"/utf8>>,<<"Приховано"/utf8>>)}
                 ]}
             ]}
         ]};
@@ -242,10 +236,11 @@ render(#post{type=post,urn=Urn,image=Image,sage=Sage}=P,#hes{board=B,thread=T}=H
                         render(message,Hes2,S)
                     ]},
                     render(links,#hes{post=P},S),
-                    #panel{class= <<"hidden-info">>,body= <<"Скрыто"/utf8>>}
+                    #panel{class= <<"hidden-info">>,body=?TR(<<"Скрыто"/utf8>>,<<"Hidden"/utf8>>,<<"Приховано"/utf8>>)}
                 ]}
             ]}
         ]}.
+
 
 event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= thread orelse Target =:= post ->
     wf:info(?M,"Adding post ~p",[Target]),
@@ -275,7 +270,7 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
         {_,_,SZM,_} when SZM > LIMM -> Warning(<<"Very long message, LOL">>);
         {_,_,0,#rst{image_ftp=?UNDEF}} -> Warning(<<"Nothing publish">>);
         {_,SZT,SZM,Rst} ->
-            #st{board=#board{id=Bid,feed_id={board,PartyId}}=StateBoard,thread=StateThread}=S=spa:st(),
+            #st{board=#board{id=Bid,feed_id={board,PartyId},view=Bview}=StateBoard,thread=StateThread}=S=spa:st(),
             Pid=kvs:next_id(post,1),
             Tid=case Target of post -> StateThread#post.id; thread -> Pid end,
             
@@ -304,7 +299,6 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                         board=Bid,
                         thread=Tid,
                         post=case Target of thread -> ?UNDEF; post -> Pid end,
-                        
                         created=erlang:timestamp(),
                         name=FileName,
                         path=ConvertedPath,
@@ -337,7 +331,10 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
             %
             % APPEND POST/THREAD (SYNC)
             %
-            {ok,Post}=erlach_feeds:append(Addition),
+            IsBump=not is_bumplimit(S),
+            IsUpdateRecent=not spa:option(tor_only,Bview,false),
+            {ok,Post}=erlach_feeds:append(Addition,IsBump,IsUpdateRecent),
+            erlach_search:index_post(Post),
             
             %
             % ANY MODIFY OPS (MESSAGING, EDITING)
@@ -397,10 +394,7 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                     wf:wire(#jq{target="qs('#input .post-message')",property=outerHTML,args=simple,format="'~s'",
                         right=[#panel{class= <<"post-message">>,
                             body=render(message,spa:setoption(limit,wf:config(erlach,board_char_limit,300),#hes{post=Post}),S)}]}),
-                    wf:wire(#insert{
-                        target=input,
-                        elements=render({'post-manage',Post},#hes{},S),
-                        position=afterbegin});
+                    wf:update({qs,"#input .post-manage"},render({'post-manage',Post},#hes{},S));
                 post ->
                     wf:wire(#jq{target="qs('#input .post-message')",property=outerHTML,args=simple,format="'~s'",
                         right=[#panel{class= <<"post-message">>,body=[
@@ -409,16 +403,15 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                                 ]},
                             render(links,#hes{post=Post},S)
                         ]}),
-                    wf:wire(#insert{
-                        target=input,
-                        elements=render({'post-manage',Post},#hes{board=StateBoard,thread=StateThread,post=Post},S),
-                        position=afterbegin}),
+                    wf:update({qs,"#input .post-manage"},render({'post-manage',Post},#hes{board=StateBoard,thread=StateThread,post=Post},S)),
                     wf:wire(#insert{
                         target={qs,"#input .post-flash"},
-                        elements=#panel{class= <<"hidden-info">>,body= <<"Скрыто"/utf8>>},
+                        elements=#panel{class= <<"hidden-info">>,body=
+                            ?TR(<<"Скрыто"/utf8>>,<<"Hidden"/utf8>>,<<"Приховано"/utf8>>)},
                         position=beforeend})
             end,
             wf:wire(#jq{target=input,property=id,right=erlach_utils:post_id(Post)}),
+            
             wf:wire("onAddPostSelf();"),
             case Target of
                 thread ->
@@ -435,12 +428,14 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                     wf:send({thread,Tid},{server,#pubsub{target=content,action=add,data=Post,from=self()}})
             end
     end, [];
+
 event(#pubsub{target=content,action=add,data=#post{type=post,urn=Urn,feed_id={post,Tid},sage=Sage}=P,from=Proc}) ->
     wf:info(?M,"RECEIVE add #post{} ~p",[self()]),
     
     % bump limit check
     #st{view=View,board=B,thread=T}=S=spa:st(),
-    ReadOnly=is_read_only(S),
+    IsArchived=is_archived(S),
+    BumpLimit=is_bumplimit(S),
     
     AutoExpand=case lists:keyfind('auto-expand', 1, View) of {'auto-expand',true} -> true; _ -> false end,
     PostsNew=#panel{id= <<"posts-new">>,class=case AutoExpand of true -> <<"auto">>; false -> <<>> end},
@@ -456,7 +451,7 @@ event(#pubsub{target=content,action=add,data=#post{type=post,urn=Urn,feed_id={po
                 #wire{actions="qi('posts-new-controls').remove();"},
                 #insert{target=content,elements=PostsNew},
                 #insert{target=content,elements=render('posts-new-controls',S)},
-                case ReadOnly of
+                case IsArchived of
                     false -> #insert{target=content,elements=#media_input{id=input,target=post}};
                     true -> [] end,
                 #jq{target=Panel,property=["dataset.id"],right=Urn},
@@ -466,7 +461,7 @@ event(#pubsub{target=content,action=add,data=#post{type=post,urn=Urn,feed_id={po
                 #focus{target={qs,"#input .post-message"}}
             ]});
         _ ->
-            case ReadOnly of false -> skip; true -> wf:remove('input') end,
+            case IsArchived of false -> skip; true -> wf:remove('input') end,
             wf:insert_bottom(<<"posts-new">>,render(P,#hes{board=B,thread=T},S)),
             case AutoExpand of
                 true -> skip;
@@ -474,18 +469,19 @@ event(#pubsub{target=content,action=add,data=#post{type=post,urn=Urn,feed_id={po
             end,
             wf:update('posts-new-controls',render('posts-new-controls',S))
     end,
-    case ReadOnly of false -> skip; true -> spa:success(<<"Bump limit raised, bro">>) end;
-
+    case BumpLimit of false -> skip; true -> spa:success(<<"Bump limit raised, bro">>) end;
 
 event(#pubsub{target=content,action=put,data=#post{id=Id}=PT,from=_Proc}=E) ->
     wf:info(?M,"Pubsub: ~p (~p)",[E,self()]),
     S2=case spa:st() of #st{thread=#post{id=Id}}=S -> spa:st(S#st{thread=PT}); S -> S end, % update state (thread)
     wf:update(spa:id({{post,answers},Id}),render(links,#hes{post=PT},S2)),
     wf:wire(["render('",erlach_utils:post_id(PT),"');"]);
+
 event(#view{target=post,option=expand,element=E}) -> % show new posts
     wf:wire(wf:f("var x=qi('~s'); x && x.removeAttribute('id');",[E])), % guarded style istead #jq{}
     erlach_utils:hidden(), % clear
     wf:update('posts-new-controls',[#panel{id=E},render('posts-new-controls',spa:st())]);
+
 event(#view{target=post,option=auto,element=E}=Event) -> % show new posts AUTO
     S=spa:st(),
     View=lists:keystore('auto-expand',1,S#st.view,{'auto-expand',true}),
@@ -508,7 +504,8 @@ event(#render_event{target=input,event={sage,Boolean,Sage}}) when is_boolean(Boo
     wf:update(Sage,#button{id=Sage,class=case Boolean of true -> <<"black checked">>; false -> <<"black">> end,
         postback=#render_event{target=input,event={sage,not Boolean,Sage}},
         body=[ #span{class=ru,body= <<"Сажи"/utf8>>},
-            #span{class=en,body= <<"Sage"/utf8>>} ],value=Boolean});
+            #span{class=en,body= <<"Sage"/utf8>>},
+            #span{class=ua,body= <<"Сажи"/utf8>>} ],value=Boolean});
     
 event(#delete{target=thread,value=Tid}) -> % thread
     wf:info(?M,"Removing thread ~p",[Tid]),
@@ -545,9 +542,10 @@ event(#ftp{sid=Sid,status={event,init},filename=FileName,meta={meta,TempContaine
     wf:info(?M,"IMAGE INIT ~p ~p ~p ~p",[self(),FileName,Size,TempContainer]),
     
     convert_abort(),
-    wf:wire(["var x=qi('",TempContainer,"'); x && ( x.id='",image_panel_id(FileName),"');"]),
+    wf:wire(["var x=qi('",TempContainer,"'); x && ( x.id='",erlach_utils:image_panel_id(FileName),"');"]),
     erlach_utils:rst((erlach_utils:rst())#rst{image_ftp=Ftp#ftp{meta={process,FileName,Width,Height}}}),
-
+    
+    
     %
     % Init convert entry
     %
@@ -578,7 +576,7 @@ event(#ftp{sid=Sid,status={event,stop},filename=FileName,meta={meta,ImageContain
     Key=key(Ftp),
     Group=key_group(),
     erlach_image:run(Key,Group);
-    
+
 event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={error,Reason},from=From}=Evt) ->
     wf:warning(?M,"~p Convert error: ~p",[self(),{Reason,Key}]),
     case self() of
@@ -589,10 +587,11 @@ event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={error,Reas
                 Key -> erlach_utils:rst(Rst#rst{image_ftp=?UNDEF});
                 _ -> skip
             end,
-            wf:wire(["uploadFileError('",image_panel_id(Key),"');"]),
+            wf:wire(["uploadFileError('",erlach_utils:image_panel_id(Key),"');"]),
             ok;
         _ -> skip % TODO: remove image panel
     end;
+
 event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={ok,Storage,Path,FileNameExt,InfoA,InfoB}=D,from=From}=Evt) ->
     wf:info(?M,"RECEIVE converted image ~p ~p ~p",[self(),erlach_utils:rst(),Evt]),
 
@@ -604,12 +603,14 @@ event(#pubsub{target=image,action=convert,element=Key,meta=Meta,data={ok,Storage
             wf:info(?M,"RECEIVE converted image ~p ~p ",[self(),skip]),
             skip
     end,
-    Wire=["imgLoad('",image_panel_id(Key),"','",url(Path,FileNameExt),"');"],
+    Wire=["imgLoad('",erlach_utils:image_panel_id(Key),"','",url(Path,FileNameExt),"');"],
     wf:info(?M,"RECEIVE converted image ~p ~p ",[self(),{wire,Wire}]),
     wf:wire(Wire),
     wf:info(?M,"RECEIVE converted image ~p ~p ",[self(),{wire,ok}]);
 
-event(Unknown) -> wf:info(?M,"Unknown Event ~p ~n~n~n",[Unknown]), ?EVENT_ROUTER:unknown(?M,Unknown).
+event(Unknown) ->
+    wf:info(?M,"Unknown Event ~p ~n~n~n",[Unknown]), ?EVENT_ROUTER:unknown(?M,Unknown).
+
 
 key(#ftp{filename=Key}) -> Key.
 key_group() -> default.
@@ -663,11 +664,11 @@ convert_error(Entry) ->
 count(Tid) -> case kvs:get(feed,{post,Tid}) of {ok,#feed{count=Pc}} -> Pc; _ -> 0 end.
 limit(#board{limit=L}) -> case L of L when is_integer(L) -> L; _ -> wf:config(erlach,bump_limit,500) end.
 
-is_read_only(#st{thread=#post{readonly=true}}) -> true;
-is_read_only(#st{board=B,thread=#post{id=Tid}}=S) -> is_read_only(count(Tid),limit(B));
-is_read_only(_) -> false.
 
-is_read_only(Count,Limit) -> Count >= Limit.
+is_archived(_) -> false.
+
+is_bumplimit(#st{board=B,thread=#post{id=Tid}}=S) -> count(Tid) >= limit(B);
+is_bumplimit(_) -> false.
 
 storage() -> wf:to_binary(wf:config(erlach,storage,code:priv_dir(erlach))).
 upload_path(FileName) -> filename:join(wf:config(n2o,upload),FileName).
@@ -677,5 +678,3 @@ url(Path,FileName) -> filename:join([wf:config(erlach,storage_urn),wf:to_binary(
 url(#attachment{name=N,path=P,info=I}) -> url(P,[N,erlach_image:ext(I)]).
 
 path(#attachment{name=N,path=P,info=I}) -> filename:join([storage(),P,[N,erlach_image:ext(I)]]). % for erlach_feeds
-
-image_panel_id(FileName) -> "im-"++spa_utils:hash({image_key,FileName}).

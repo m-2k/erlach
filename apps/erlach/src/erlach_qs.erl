@@ -34,13 +34,15 @@ mp({post,B,T,P}) -> #postback{action=view,query=#query{q1=urn(B),q2=urn(T),q3=ur
 
 up_state(X) -> (mp(X))#postback{route_option=state_update_only}.
 
+is_in_thread_postback(#postback{query=#query{q1= <<"search">>}}) -> false;
 is_in_thread_postback(#postback{query=#query{q1= <<"stream">>}}) -> false;
 is_in_thread_postback(#postback{query=#query{q1=?URI_SERVICES,q3=Q3}}) -> is_in_thread_postback(#postback{query=#query{q2=Q3}});
 is_in_thread_postback(#postback{query=#query{q2=?UNDEF}}) -> false;
 is_in_thread_postback(#postback{query=#query{q2= <<>>}}) -> false;
 is_in_thread_postback(#postback{query=#query{q2=UrnT}}) ->
     case spa:st() of
-        #st{thread=#post{type=thread,urn=UrnT}} -> true;
+        #st{action=search} -> false;
+        #st{thread=#post{type=thread,urn=UrnT}}=S -> true;
         _ -> false
     end.
 
@@ -57,6 +59,7 @@ query_to_path(#query{q1=Q1,q2=Q2,q3=Q3,q4=Q4}) ->
     end.
 
 state_to_query(?UNDEF) -> #query{};
+state_to_query(#st{action=search,search=Q}) -> #query{q1= <<"search">>,q2=Q};
 state_to_query(#st{route=#route{render=R,level=L}}=S) ->
     wf:info(?M,"state_to_query: ~p",[1]),
     case R:urn() of
@@ -80,6 +83,9 @@ state_to_query_dyn(#st{board=B,thread=T,post=P,services=Svc}) ->
 state_to_render(#st{route=#route{render=?UNDEF,module=Module}}) -> Module;
 state_to_render(#st{route=#route{render=Render}}) -> Render.
 
+title(Render,#st{action=search}=S) -> ?SEARCH:title(S);
+title(Render,#st{}=S) -> Render:title(S).
+
 history_init() -> history_send(true).
 history_update() -> history_send(true).
 history_push() -> history_send(false).
@@ -88,7 +94,7 @@ history_send(IsReplace) when is_boolean(IsReplace) ->
     Query=state_to_query(State),
     Secret=n2o_secret:pickle(Query),
     Render=state_to_render(State),
-    Title=wf:jse(Render:title(State)),
+    Title=wf:jse(title(Render,State)),
     wf:info(?M,"History Query: ~p",[Query]),
     Path=query_to_path(Query),
     wf:info(?M,"History Path: ~p",[Path]),

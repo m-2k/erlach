@@ -49,9 +49,62 @@
         
         <div class='drag'></div>
         <div id='viewer'><div class='fl cent monitor'><div class='media'></div></div></div>
+        <div id='input-helper' class='fl modal-window'>
+            <div class="modal-window-controls">
+                <h5 class='modal-window-item'><span class="ru">Разметка</span><span class="en">Marking</span></h5>
+                <div class='modal-window-item fl'>
+                    <span>&gt;&gt;/b/</span>
+                    <strong>→</strong>
+                    <span><a class="link" title="/Б/ред – b" href="/b">&gt;&gt;/b/</a></span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>**Bold**</span>
+                    <strong>→</strong>
+                    <span class='strong'>Bold</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>*Italic*</span>
+                    <strong>→</strong>
+                    <span class='italic'>Italic</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>&gt;Citate</span>
+                    <strong>→</strong>
+                    <span class='citate'>&gt;Citate</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>%%Spoiler%%</span>
+                    <strong>→</strong>
+                    <span><span class='spoiler'>Spoiler</span></span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>Strikeout^W</span>
+                    <strong>→</strong>
+                    <span class='strikeout'>Strikeout</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>`Inline Code`</span>
+                    <strong>→</strong>
+                    <span class="code hljs nginx"><span class="hljs-attribute">Inline</span> Code</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span><span>```<br>Multiline<br>Code<br>```</span></span>
+                    <strong>→</strong>
+                    <span class="code-multi hljs">Multiline<br>Code</span>
+                </div>
+                <div class='modal-window-item fl'>
+                    <span>````erlang<br>fun Multiline(Erlang) -&gt;<br>&nbsp;&nbsp;Code<br>end.<br>```</span>
+                    <strong>→</strong>
+                    <span class="code-multi erlang hljs"><span class="hljs-keyword">fun</span> Multiline(Erlang) -&gt;<br>&nbsp;&nbsp;Code<br>end.</span>
+                </div>
+                <button type="button" onclick="inputHelper(false);">
+                    <span class="ru">Понял</span><span class="en">OK</span>
+                </button>
+            </div>
+        </div>
         <div id='popup-messages'></div>
         
-        <script>var transition = {pid: '', host: 'localhost', port:'8000'};</script>
+        <script>var transition = {pid: '', host: location.hostname, port: location.port || (location.protocol==='https:'?'443':'80')};</script>
         
         <script src='/n2o/protocols/bert.js'></script>
         <script src='/n2o/protocols/client.js'></script>

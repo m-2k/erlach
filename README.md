@@ -17,14 +17,18 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](erlach-R3-RC8-febrary-2017-white.png)
+![Screenshot](screenshots/erlach-R3-RC9-august-2017-white.avif)
+
+![Code Snippet](screenshots/erlach-R3-RC9-august-2017-code-snippets.avif)
 
 
 ## Requirements
 
 * Unix
-* [Erlang/OTP 18](https://github.com/kerl/kerl?tab=readme-ov-file#using-kerl)
-* libjpeg-progs (`apt-get install libjpeg-progs`)
+* [Erlang/OTP 19](https://github.com/kerl/kerl?tab=readme-ov-file#using-kerl)
+* libjpeg-progs
+* optipng
+* ImageMagick
 * [libbpg](https://bellard.org/bpg/)
 * inotify-tools (optional for live code reload)
 
@@ -32,25 +36,50 @@
 
 1. Srart attached docker container
 ```sh
-docker pull erlang:18.3.3
-docker run --rm -it -p 8000:8000 -v "$(pwd)":/app -w /app erlang:18.3.3 bash
+docker pull erlang:19.3.6.13
+docker run --rm -it -p 8000:8000 -v "$(pwd)":/app -w /app erlang:19.3.6.13 bash
 ```
-2. Setup Git configuration into docker container and start Erlang app with REPL mode
+
+2. Install requirements into docker container
+```sh
+# package manager
+cat <<EOF > /etc/apt/sources.list
+deb [trusted=yes] http://archive.debian.org/debian/ stretch main contrib non-free
+deb [trusted=yes] http://archive.debian.org/debian/ stretch-updates main contrib non-free
+deb [trusted=yes] http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
+EOF
+
+# install packages from apt
+apt-get update
+apt-get install -y build-essential libjpeg-progs pkg-config wget ca-certificates cmake
+apt-get install -y libjpeg-dev libpng-dev libgif-dev libz-dev
+apt-get install -y libsdl-dev libsdl-image1.2-dev optipng imagemagick
+
+# build and install libbpg
+wget https://bellard.org/bpg/libbpg-0.9.8.tar.gz -P /tmp
+tar -xvzf /tmp/libbpg-0.9.8.tar.gz -C /tmp
+cd /tmp/libbpg-0.9.8 && make && make install
+```
+
+3. Setup Git configuration into docker container and get dependencies
 ```sh
 git config --system url."https://github.com/".insteadOf git://github.com/
+cd /app
+./mad deps
 ```
 
-3. Get dependencies, compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
+4. Compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
 ```sh
-./mad deps compile repl
+cd /app
+./mad compile repl
 ```
 
-4. Init Erlach database into ERTS terminal
+5. Init Erlach database into ERTS terminal
 ```erlang
 erlach_db:init_db().
 ```
 
-5. Open URL [http://localhost:8000/](http://localhost:8000/) on host system
+6. Open URL [http://localhost:8000/](http://localhost:8000/) on host system
 
 
 ## Feedback

@@ -30,54 +30,59 @@ render(content=Panel,#st{}=S) ->
 render_content(Panel,Body) ->
     #panel{id=Panel,body=[
         #panel{class= <<"content-title">>,body=[
-            #span{class=section,body=?TR(<<"Войти"/utf8>>,<<"Sign in">>)},
-            ?TR(<<"в Эрлач"/utf8>>,<<"to Erlach">>)
+            #span{class=section,body=?TR(<<"Войти"/utf8>>,<<"Sign in">>,<<"Зайти"/utf8>>)},
+            ?TR(<<"в Эрлач"/utf8>>,<<"to Erlach">>,<<"на Эрлач"/utf8>>)
         ]},
         Body,
         #span{class= <<"remark orange">>,body=?TR(<<"Создай учётную запись за 15 секунд, если ещё не сделал этого"/utf8>>,
-            <<"Create your account in 15 seconds, if you have not done so">>)},
+            <<"Create your account in 15 seconds, if you have not done so">>,
+            <<"Створи обліковий запис за 15 секунд, якщо ще цього не зробив"/utf8>>)},
         #panel{class=[fl,cent],body=#a{class=[b,xl,orange],
-            body=?TR(<<"Создать аккаунт в Эрлаче"/utf8>>,<<"Create Erlach Account">>),
+            body=?TR(<<"Создать аккаунт в Эрлаче"/utf8>>,<<"Create Erlach Account">>,<<"Створити акаунт на Эрлачі"/utf8>>),
             postback=erlach_qs:mp(join),href=erlach_qs:ml(join)}}
         
     ]}. 
 render_auth() ->
     [ #span{class= <<"remark blue">>,body=?TR(<<"Авторизовывайся если уже имеешь аккаунт"/utf8>>,
-        <<"Sign in if you already have an account">>)},
+        <<"Sign in if you already have an account">>,<<"Авторизуйся, якщо вже маєш аккаунт"/utf8>>)},
     #panel{id=auth, actions=keyboardInputHelper(multiple), body=[
         #panel{class= <<"fl login-form">>,body=[
             #textbox{id=login,class=xl,placeholder= <<"Email">>,autofocus= <<"autofocus">>},
             #password{id=passwd,class=xl,placeholder= <<"Password">>},
             #button{class=xl,
-                body=?TR(<<"Войти"/utf8>>,<<"Sign in">>),
+                body=?TR(<<"Войти"/utf8>>,<<"Sign in">>,<<"Зайти"/utf8>>),
                 onclick="this.disabled = true",
                 postback=#render_event{target=auth,event=signin},
                 source=[login,passwd]},
-            #panel{class=addition,body=#a{body=?TR(<<"Сбросить пароль"/utf8>>,<<"Reset password">>),
+            #panel{class=addition,body=#a{body=?TR(<<"Сбросить пароль"/utf8>>,<<"Reset password">>,<<"Скинути пароль"/utf8>>),
                 postback=erlach_qs:mp({signin,<<"reset-password">>})}}
         ]}
     ]}].
 render_reset() ->
     [ #span{class=[remark,sea],body=?TR(<<"Мы вышлем тебе новый пароль"/utf8>>,
-        <<"We will send U a new password">>)},
+        <<"We will send U a new password">>,
+        <<"Ми вишлемо тобі новий пароль"/utf8>>)},
     #panel{id=auth, actions=keyboardInputHelper(single), body=[
         #panel{class= <<"fl login-form">>,body=[
             #textbox{id=login,class=[xl,sea],placeholder= <<"Email">>,autofocus= <<"autofocus">>},
             #button{class=[xl,sea],
-                body=?TR(<<"Сбросить пароль"/utf8>>,<<"Reset password">>),
+                body=?TR(<<"Сбросить пароль"/utf8>>,<<"Reset password">>,<<"Скинути пароль"/utf8>>),
                 onclick="this.disabled = true",
                 postback=#render_event{target=auth,event=reset},source=[login]},
-            #panel{class=addition,body=#a{class=[signin,xl,sea],body=?TR(<<"Войти по паролю"/utf8>>,<<"Sign in with password">>),
+            #panel{class=addition,body=#a{class=[signin,xl,sea],body=?TR(<<"Войти по паролю"/utf8>>,
+                <<"Sign in with password">>,<<"Зайти з паролем"/utf8>>),
                 postback=erlach_qs:mp(signin)}}
         ]}
     ]}].
 render_reset_ok() ->
-    [ #span{class= <<"remark blue">>,body=?TR(<<"Проверяй почту!"/utf8>>,<<"Check U mailbox!">>)},
+    [ #span{class= <<"remark blue">>,body=?TR(<<"Проверяй почту!"/utf8>>,
+        <<"Check U mailbox!">>,<<"Перевір поштову скриньку!"/utf8>>)},
     #panel{id=auth,body=#panel{class= <<"fl vert">>,body=[
-        #h2{class= <<"post-topic">>,body=?TR(<<"Наши поздравления!"/utf8>>,<<"Congratulations!">>)},
+        #h2{class= <<"post-topic">>,body=?TR(<<"Наши поздравления!"/utf8>>,<<"Congratulations!">>,<<"Наші вітання!"/utf8>>)},
         #span{class=legend,body=?TR(<<"Пароль был сгенерирован заново и выслан на почту"/utf8>>,
-            <<"Password has been updated and sent to your mailbox">>)},
-        #a{class=[xl,sea],body=?TR(<<"Войти по паролю"/utf8>>,<<"Sign in with password">>),
+            <<"Password has been updated and sent to your mailbox">>,
+            <<"Пароль був згенерований заново та висланий на пошту"/utf8>>)},
+        #a{class=[xl,sea],body=?TR(<<"Войти по паролю"/utf8>>,<<"Sign in with password">>,<<"Зайти з паролем"/utf8>>),
             postback=erlach_qs:mp(signin)}
     ]}}].
     

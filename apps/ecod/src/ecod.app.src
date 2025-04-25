@@ -1,0 +1,9 @@
+{application, ecod,
+  [
+    {description, "Erlang Util Library"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [kernel, stdlib]},
+    {mod, { ecod, []}},
+    {env, []}
+  ]}.

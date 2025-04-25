@@ -1,5 +1,5 @@
 -define(APP, erlach).
--define(ERLACH_VERSION, <<"R3 RC8">>).
+-define(ERLACH_VERSION, <<"R3 RC9">>).
 -define(ERLACH_VERSION_NUMBER, 2.993).
 
 -include_lib("n2o/include/wf.hrl").
@@ -7,6 +7,7 @@
 -include_lib("kvs/include/config.hrl").
 -include_lib("erlach_db/include/erlach_db.hrl").
 -include_lib("spa/include/spa_basic.hrl").
+-include_lib("spa/include/spa_elements.hrl").
 
 -define(SITE_ROOT_LOCATION, "apps/erlach/priv").
 -define(ATTACHMENT_LOCATION, "static/attachments").
@@ -21,15 +22,13 @@
 -define(URN_PAGE_DYNAMIC, <<"urn-dynamic">>).
 -define(URN_PAGE_MAIN, ?UNDEF).
 
--define(TR(Ru,En), [#span{class=ru,body=Ru},#span{class=en,body=En}]).
+-define(TR(Ru,En,Ua), [#span{class=ru,body=Ru},#span{class=en,body=En},#span{class=ua,body=Ua}]).
 
 -define(UPLOAD_MIN_SIZE, 100).
 -define(UPLOAD_MAX_SIZE, 10485760). % 10MB
 
 -define(SITE_NAME, <<"Erlach">>).
 -define(TITLE_DELIMETER, <<" – "/utf8>>).
-
--define(CONFIG,erlach_config).
 -define(SIMPLE_EVENT,simple_event).
 -define(USER_ACTIVATION,activation).
 -define(RPL,<<">>"/utf8>>).
@@ -68,7 +67,8 @@
     thread,
     post,
     view = [],
-    services = false :: false | comments
+    services = false :: false | comments,
+    search = <<>>
     ).
 
 -record(rst, {
@@ -84,7 +84,6 @@
 -record(auth, { ?RDR_EV(erlach_auth), user, passwd, logout }).
 -define(RDR_PUBSUB_RENDER,erlach_subscription).
 
-
 -include_lib("nitro/include/nitro.hrl").
 -record(hookup, {?ELEMENT_BASE(element_hookup),href,hreflang,media,rel,target,type,
     url="javascript:void(0);",download,name}).
@@ -95,8 +94,8 @@
 -define(SUB,erlach_subscription).
 -define(BOARD,erlach_board).
 -define(THREAD,erlach_thread).
+-define(SEARCH,erlach_search).
 -define(SERVICES,erlach_services).
 -define(STREAM,erlach_stream).
 
 -include_lib("spa/include/spa.hrl").
--include_lib("spa/include/spa_elements.hrl").

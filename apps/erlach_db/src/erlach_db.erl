@@ -34,7 +34,7 @@ metainfo() ->
         ]}.
 
 init_db() ->
-    0 =:= kvs:count(board), % guard
+    0 = kvs:count(board), % guard
     Group=fun(Name,Desc,Boards) ->
         Gid=kvs:next_id(party,1),
         kvs:add(#party{id=Gid,created=erlang:timestamp(),
@@ -134,6 +134,22 @@ int() ->
     {ok,#party{id=P}}=add_party(<<"INTERNATIONAL">>,<<"">>,false),
     add_board(P,<<"~b">>,<<"/B/ullshit">>,<<"Welcome back, bitard">>,false).
 
+set_board_view(BinName,Property,Value) ->
+    [#board{}=B]=kvs:index(board,urn,BinName),
+    FunUpdate=fun(#board{view=V0}=B0) -> {ok,B0#board{view=spa:setoption(Property,Value,V0)}} end,
+    erlach_feeds:update(B,FunUpdate).
+
+show_party(Party,On) when is_boolean(On) ->
+    {ok,P}=kvs:get(party,Party),
+    kvs:put(P#party{hidden=not On}).
+    
+    
+add_board(rec) -> add_board(1,<<"rec">>,<<"Recursion"/utf8>>,<<"Доска конференции Recursion"/utf8>>,false);
+
+
+add_board(bdr) -> add_board(8,<<"bdr">>,<<"Бандеровцы"/utf8>>,<<"Для укрофашистов и работников львовского метрополитена"/utf8>>,false);
+add_board(stn) -> add_board(8,<<"stn">>,<<"Сталинисты"/utf8>>,<<"Для тех, кто душой в СССР и скучает по Берии и продразверстке"/utf8>>,false);
+
 add_board(fap) -> add_board(11,<<"fapfapfapchan.ga">>,<<"Фапчан"/utf8>>,<<"Оверчан всех порнографических досок галактики"/utf8>>,false);
 add_board(rf) -> add_board(9,<<"rf">>,<<"Убежище"/utf8>>,<<"Хиккую как хочу"/utf8>>,true);
 add_board(eot) -> add_board(9,<<"eot">>,<<"Есть Одна Тян"/utf8>>,<<"Одна из миллиардов"/utf8>>,false);
@@ -171,7 +187,7 @@ populate() ->
     Bid = 1,
     Thread=fun() ->
         Pid=kvs:next_id(post,1),
-        kvs:add(#post{type=thread,id=Pid,created=erlang:timestamp(),feed_id={thread,Bid},urn=erlach_utils:id_to_urn(Pid),
+        kvs:add(#post{type=thread,id=Pid,created=erlang:timestamp(),feed_id={thread,Bid},urn=erlach_qs:id_to_urn(Pid),
             name_escaped=wf:to_binary(wf:temp_id()),message_escaped=wf:to_binary(wf:temp_id())})
         end,
     [ Thread() || _ <- lists:seq(1,10) ],
@@ -180,10 +196,10 @@ populate() ->
 % x-counted posts in custom-thread
 populate(Tid,Count) when is_binary(Tid) -> populate(erlach_qs:urn_to_id(Tid),Count);
 populate(Tid,Count) when is_integer(Tid)->
-    {ok,T}=kvs:get(post,Tid),
-    Post=fun() ->
+    {ok,_}=kvs:get(post,Tid),
+    lists:map(fun(Num) ->
         Pid=kvs:next_id(post,1),
-        kvs:add(#post{id=Pid,created=erlang:timestamp(),feed_id={post,Tid},type=post,
-            urn=erlach_qs:id_to_urn(Pid),message_escaped=wf:to_binary(wf:temp_id())})
-    end,
-    spa_utils:times(Post,Count).
+        P=#post{id=Pid,created=erlang:timestamp(),feed_id={post,Tid},type=post,
+            urn=erlach_qs:id_to_urn(Pid),message=wf:to_binary(["test-message-",wf:to_list(Num)])},
+        {ok,_}=erlach_feeds:append(P)
+    end,lists:seq(1,Count)), ok.

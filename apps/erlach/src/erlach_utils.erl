@@ -20,10 +20,16 @@ hidden() -> R=rst(), H=R#rst.hidden_elements,rst(R#rst{hidden_elements=[]}), H.
 
 enc(T) -> wf:html_encode(wf:to_list(T)).
 
-post_id(Pid) when is_integer(Pid) -> "e-"++spa_utils:hash({post,Pid});
-post_id(#post{id=Pid}) -> post_id(Pid);
-post_id(#attachment{post=Pid}) when is_integer(Pid) -> post_id(Pid);
-post_id(#attachment{thread=Tid}) when is_integer(Tid) -> post_id(Tid).
+post_id(P) -> post_id(P,spa:st()).
+post_id(Pid,#st{action=search}) when is_integer(Pid) -> "es-"++spa_utils:hash({post_search,Pid});
+post_id(Pid,_) when is_integer(Pid) -> "e-"++spa_utils:hash({post,Pid});
+post_id(#post{id=Pid},S) -> post_id(Pid,S);
+post_id(#attachment{thread=Tid,post=?UNDEF},S) -> post_id(Tid,S);
+post_id(#attachment{post=Pid},S) -> post_id(Pid,S).
+
+image_panel_id(FileName) -> image_panel_id(FileName,spa:st()).
+image_panel_id(FileName,#st{action=search}) -> "ims-"++spa_utils:hash({image_key_search,FileName});
+image_panel_id(FileName,_) -> "im-"++spa_utils:hash({image_key,FileName}).
 
 % link to board
 board_link(H,#board{name=Bn,urn=Urn}=B,#st{}) ->
@@ -68,13 +74,17 @@ link(H,#post{type=post,id=Pid,feed_id={post,Tid},urn=Urn}=P,#st{}) ->
         body=[enc([?RPL,Urn]),#sup{body="ext"}],
         href=Href,
         postback=erlach_qs:mp({post,B,T,P}) }.
-
+        
 partial(#view{partial=true,table=Table,feed=Feed,start=Start,count=Count,direction=Direction}=V) ->
     case kvs:get(feed,Feed) of
         {ok,C} ->
-            Start2=case is_integer(Start) of false -> element(#container.top,C); true -> Start end,
+            {Direction2,Head}=case Direction of
+                next -> {#iterator.next,#container.rear};
+                _ -> {#iterator.prev,#container.top}
+            end,
+            Start2=case is_integer(Start) of false -> element(Head,C); true -> Start end,
             Count2=case is_integer(Count) of false -> element(#container.count,C); true -> Count end,
-            Direction2=case Direction of next -> #iterator.next; _ -> #iterator.prev end,
+            
             List=kvs:fold(fun(E,A) -> [E|A] end,[],Table,Start2,Count2,Direction2),
             case List of
                 [] -> {[],stop};

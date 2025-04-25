@@ -9,13 +9,13 @@ urn() -> <<"about">>.
 
                 
 subscr() -> [
-    {?TR(<<"Постов: "/utf8>>,<<"Posts: "/utf8>>),       {post,total},        fun wf:to_binary/1 },
-    {?TR(<<"Тредов: "/utf8>>,<<"Threads:"/utf8>>),      {thread,total},      fun wf:to_binary/1 },
-    {?TR(<<"Изображений: "/utf8>>,<<"Images: "/utf8>>), {attachment,total},  fun wf:to_binary/1 },
-    {?TR(<<"Просмотров: "/utf8>>,<<"Views: ">>),        {view,total},        fun wf:to_binary/1 },
-    {?TR(<<"Чтение: "/utf8>>,<<"Reading: ">>),          {time,online,total}, fun(C) ->
-        [wf:to_binary(trunc(C/3600)),?TR(<<" ч"/utf8>>,<<" h"/utf8>>)] end},
-    {?TR(<<"Пул соединений: "/utf8>>,<<"Connections pool: "/utf8>>),   {user,online,total}, fun wf:to_binary/1 }
+    {?TR(<<"Постов: "/utf8>>,<<"Posts: "/utf8>>,<<"Постів: "/utf8>>),       {post,total},        fun wf:to_binary/1 },
+    {?TR(<<"Тредов: "/utf8>>,<<"Threads: "/utf8>>,<<"Тредів: "/utf8>>),      {thread,total},      fun wf:to_binary/1 },
+    {?TR(<<"Изображений: "/utf8>>,<<"Images: "/utf8>>,<<"Зображень: "/utf8>>), {attachment,total},  fun wf:to_binary/1 },
+    {?TR(<<"Просмотров: "/utf8>>,<<"Views: ">>,<<"Переглядів"/utf8>>),        {view,total},        fun wf:to_binary/1 },
+    {?TR(<<"Чтение: "/utf8>>,<<"Reading: ">>,<<"Читання: "/utf8>>),          {time,online,total}, fun(C) ->
+        [wf:to_binary(trunc(C/3600)),?TR(<<" ч"/utf8>>,<<" h"/utf8>>,<<" г"/utf8>>)] end},
+    {?TR(<<"Пул соединений: "/utf8>>,<<"Connections pool: "/utf8>>,<<"Пул абонентів: "/utf8>>),   {user,online,total}, fun wf:to_binary/1 }
     ].
 
 init(#route{}=Route) ->
@@ -33,12 +33,28 @@ render(content=Panel,#st{}=S) ->
         #panel{class= <<"image-logo">>},
         #span{class= <<"remark">>,body=[?TR(
             <<"Полностью анонимная имиджборда и сервис анонимных комментариев"/utf8>>,
-            <<"Fully anonymous imageboard and anonymous comments service"/utf8>>), ", 2015-2017"] },
+            <<"Fully anonymous imageboard and anonymous comments service"/utf8>>,
+            <<"Повністю анонімна імаджборда та сервіс анонімних коментарів"/utf8>>), ", 2015-2017"] },
         #panel{class= <<"center">>,body=[
             #panel{class= <<"erlach-version">>, body=[
-                ?TR(<<"Версия"/utf8>>,<<"Version"/utf8>>),
+                ?TR(<<"Версия"/utf8>>,<<"Version"/utf8>>,<<"Версія"/utf8>>),
                 ": <strong>",?ERLACH_VERSION,"</strong>"] },
-            #a{class= <<"erlach-feedback">>, target="_blank",href="https://twitter.com/erlach_co",body= <<"Erlach on twitter">>},
+            #panel{class= <<"erlach-version">>,body= [?TR(<<"Пожертвования (BTC): "/utf8>>,
+                <<"Donate (BTC): ">>,<<"Пожертвування (BTC): "/utf8>>),
+                <<"<strong>1C2tHeg7e8ZsSGmaXDdykrHVoqQfjAiL1n</strong>">>]},
+            #br{},
+            #panel{class= <<"erlach-version">>, body=[
+                "TOR: <strong>",
+                #a{class= <<"erlach-feedback">>, target="_blank",
+                    href="http://erlach6sjul42c7h.onion/",body= <<"erlach6sjul42c7h.onion">>},
+                "</strong>"] },
+            #panel{class= <<"erlach-version">>, body=[
+                ?TR(<<"Обратная связь"/utf8>>,<<"Feedback"/utf8>>,<<"Зворотній зв\\'язок"/utf8>>),
+                ": <strong>",
+                #a{class= <<"erlach-feedback">>, target="_blank",
+                    href="https://twitter.com/erlach_co",body= <<"twitter.com/erlach_co">>},
+                "</strong>"] },
+            
             render(statistics,S)
         ]}
     ]};

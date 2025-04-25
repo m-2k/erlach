@@ -23,7 +23,7 @@ var bpgw;
 
 function getBPGWorker() {
     if(!bpgw) {
-        bpgw = new Worker('/static/bpgdec.min.js');
+        bpgw = new Worker('/static/bpgdec.js');
         bpgw.onmessage = BPGOnMessage;
     };
     return bpgw;
@@ -167,10 +167,19 @@ function render(id) {
             var a = linkList[i];
             var l = a.getAttribute('data-link');
             if(l) {
-                a.onclick = (function() { scrollToPost(this) }).bind(l) ;
-                a.onmouseenter = (function() { flashPost(this) }).bind(l);
+                a.onclick = (function() { scrollToPost(this); }).bind(l) ;
+                a.onmouseenter = (function(dataLink, elem) {
+                    flashPost(dataLink);
+                    var le = qs('[id="'+dataLink+'"]'); // linked post element
+                    if(le) {
+                        var isAnswer = !!this.parentNode.classList.contains('post-answers');
+                        requestAnimationFrame((function() {
+                            elem.parentNode.insertBefore(le, isAnswer ? elem.nextSibling : elem)
+                        }).bind(this));
+                    }
+                }).bind(a,l,e);
             }
-        }        
+        }
         render_time(e.querySelector('.time'));
         render_embed(e);
     }
@@ -227,14 +236,13 @@ function render_embed(e) {
 
 function format_timestamp(ts) {
     var diff = (Date.now() - new Date(ts) + time_warp)/1000;
-    var t = Math.trunc(diff/60/60/24/365); if(t > 0) return t + '<span class="ru"> г</span><span class="en"> Y</span>';
-        t = Math.trunc(diff/60/60/24/30);  if(t > 0) return t + '<span class="ru"> мес</span><span class="en"> Mh</span>';
-        t = Math.trunc(diff/60/60/24);     if(t > 0) return t + '<span class="ru"> дн</span><span class="en"> D</span>';
-        t = Math.trunc(diff/60/60);        if(t > 0) return t + '<span class="ru"> ч</span><span class="en"> h</span>';
-        t = Math.trunc(diff/60);           if(t > 0) return t + '<span class="ru"> мин</span><span class="en"> min</span>';
-    return  Math.trunc(diff) + " сек";
+    var t = Math.trunc(diff/60/60/24/365); if(t > 0) return t + '<span class="ru"> г</span><span class="en"> Y</span><span class="ua"> р</span>';
+        t = Math.trunc(diff/60/60/24/30);  if(t > 0) return t + '<span class="ru"> мес</span><span class="en"> Mh</span><span class="ua"> мiс</span>';
+        t = Math.trunc(diff/60/60/24);     if(t > 0) return t + '<span class="ru"> дн</span><span class="en"> D</span><span class="ua"> дн</span>';
+        t = Math.trunc(diff/60/60);        if(t > 0) return t + '<span class="ru"> ч</span><span class="en"> h</span><span class="ua"> г</span>';
+        t = Math.trunc(diff/60);           if(t > 0) return t + '<span class="ru"> мин</span><span class="en"> min</span><span class="ua"> хв</span>';
+    return  Math.trunc(diff) + '<span class="ru"> сек</span><span class="en"> sec</span><span class="ua"> сек</span>';
 };
-
 
 
 // 
@@ -243,10 +251,11 @@ function format_timestamp(ts) {
 function trim(str) { return str; };
 function unrich(id) {
     var x = qi(id);
+    console.log(x);
     x && x.addEventListener('paste', function(e) {
         e.preventDefault();
-        var text = e.clipboardData.getData('text/plain'); //.replace(/\r?\n/g,'<br/>');
-        document.execCommand('insertHTML',false, text);
+        var text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText',false, text);
     });
 }
 function cursorEnd(el){ // http://stackoverflow.com/questions/1125292/how-to-move-cursor-to-end-of-contenteditable-entity/3866442#3866442
@@ -458,7 +467,7 @@ function previewAndUploadFile(file) {
     var img = container.querySelector('img.media.image');
     var cnv = container.querySelector('canvas.media.image');
     var temp = new Image(); // for preventing infinity iteration of img.media
-    
+
     if(container) {
         var reader  = new FileReader();
         reader.onloadend = function () {
@@ -623,13 +632,11 @@ function replaceNode(destination,target) {
     
 };
 
-
 function canvasClone2(source) {
     var cnv = source.cloneNode(false);
     cnv.getContext('2d').drawImage(source, 0, 0);
     return cnv;
 };
-
 
 function animate(fun_or_e, animation) {
     var setup=function(e,a) { e.style.webkitAnimationName = e.style.animationName = a; };
@@ -638,7 +645,6 @@ function animate(fun_or_e, animation) {
     setup(take(fun_or_e), '');
     window.setTimeout(function() { setup(take(fun_or_e), animation); }, 4);
 }
-
 
 /*********************** VIEWER BEGIN ***********************/
 
@@ -717,7 +723,6 @@ function viewerShowImage(e) {
     qi('viewer-whatanime').href=URI_WHATANIME_IMG_SEARCH+encodeURIComponent(url);
     
     if(!viewer.active) {
-        // !(url && url.endsWith('.gif')) && vieverAnimate('bounceIn');
         viewerOpen(e);
     }
 };
@@ -788,10 +793,8 @@ function shadowOnLoad(shadowed) {
         case 'bpg': console.log('Logic error 1'); break;
         case 'gif':
             debug && console.log('shadowOnLoad GIF');
-            // requestAnimationFrame((function() {
-                shadowed.classList.remove('hidden');
-                canvas.classList.add('hidden');
-            // }).bind(this));
+            shadowed.classList.remove('hidden');
+            canvas.classList.add('hidden');
             setActionOnImage(shadowed);
             uploadFileFinished(container);
             break;
@@ -962,6 +965,7 @@ function loadSettings() {
     load('no-soundcloud');
     load('snow');
     load('theme');
+    load('nsfw');
 };
 function saveSettings() {
     var save=function(opt) { var x=qi('option-'+opt); x && ( ls(['opt',opt], getNodeValue(x)) ) };
@@ -972,6 +976,7 @@ function saveSettings() {
     save('no-soundcloud');
     save('snow');
     save('theme');
+    save('nsfw');
     applySettings();
 };
 
@@ -1129,7 +1134,6 @@ function snowLoop() {
             
         }
     }
-    // requestAnimationFrame(snow);
 };
 
 function snowFlake(ctx,x,y,size,color,type,rotation,derection) {
@@ -1138,25 +1142,19 @@ function snowFlake(ctx,x,y,size,color,type,rotation,derection) {
     
     switch(type) {
         case 1:
-        case 2:
-        case 3:
-            // https://jsfiddle.net/okkpbgh1/1/
-
             size *= 2;
             var c = {x:x, y:y}, fx, ff, f = rotation*derection;
             fx = type === 1 ? 0.7 : type === 2 ? 0.5 : 0.3;
 
             var line = function(c, x,y, fx) {
-        		x = c.x + (size / 2 * Math.sin(f+fx));
+                x = c.x + (size / 2 * Math.sin(f+fx));
                 y = c.y + (size / 2 * Math.cos(f+fx));
                 ctx.lineTo(x, y);
                 return {x:x, y:y};
             };
 
             var FF = function(step) { return (Math.PI / 2) * step; };
-
             ctx.beginPath();
-
             for(var i = 0; i < 4; i++) {
                 var ff = FF(i);
                 ctx.moveTo(x,y);
@@ -1269,3 +1267,9 @@ function keyboardInputHelper(selector) {
     }};
     x && p(x) && ael(p(x)) && p(p(x)) && ael(p(p(x)));
 };
+
+
+function inputHelper(on) {
+    var h = qi('input-helper');
+    if(h) { if(on) { h.classList.add('active'); animate(h, 'viewer-open'); } else { h.classList.remove('active'); } }
+}
