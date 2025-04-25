@@ -17,9 +17,13 @@
 * Single page application (SPA)
 * [WebSocket](https://www.rfc-editor.org/rfc/rfc6455.html) transport
 
-![Screenshot](screenshots/erlach-R3-RC9-august-2017-white.avif)
+![Screenshot](screenshots/erlach-R3-RC10-september-2017-white.avif)
 
-![Code Snippet](screenshots/erlach-R3-RC9-august-2017-code-snippets.avif)
+![Erlach Chat](screenshots/erlach-R3-chat.gif)
+
+![Erlach Search](screenshots/erlach-R3-search.gif)
+
+![Erlach Subscription](screenshots/erlach-R3-subscriptions.gif)
 
 
 ## Requirements
@@ -71,7 +75,8 @@ cd /app
 4. Compile and run Erlach with [mad](https://github.com/synrc/mad/tree/1.9)
 ```sh
 cd /app
-./mad compile repl
+./mad compile
+./mad repl # for correct logging DO NOT combine arguments like here: ./mad com rep for 
 ```
 
 5. Init Erlach database into ERTS terminal

@@ -10,7 +10,7 @@ urn() -> ?URN_PAGE_DYNAMIC.
 access(#board{view=V}) ->
     {Origin,_Req}=cowboy_req:header(<<"origin">>,?REQ),
     ViewTor=spa:option(tor_only,V),
-    wf:warning(?M,"Board Tor: ~p, (origin: ~p)",[ViewTor,Origin]),
+    wf:info(?M,"Board Tor: ~p, (origin: ~p)",[ViewTor,Origin]),
     Access=case {ViewTor,Origin} of
         {true,<<"http://",_:128,".onion">>} -> allow;
         {true,<<"https://",_:128,".onion">>} -> allow;
@@ -50,12 +50,14 @@ guard_addition(#st{board=#board{feed_id={board,PartyId}}}) ->
     case kvs:get(party,PartyId) of {ok,#party{type=services}} -> false; _ -> true end;
 guard_addition(_) -> true.
 
+%%% Render/2
+%%% 
 render(content=Panel,#st{board=#board{id=Bid,name=Name,desc=Desc}=B}=S) ->
     wf:info(?M,"Board: ~p ~p",[Bid,guard_addition(S)]),
     Elements=case kvs:get(feed,{thread,Bid}) of
         {ok, #feed{top=Top,count=Count}} ->
             kvs:fold(fun(T,Acc) ->
-                [[render(T,#hes{board=B},S),render(last,#hes{board=B,thread=T},S)] | Acc]
+                    [[render(T,#hes{board=B},S),render(last,#hes{board=B,thread=T},S)] | Acc]
             end,[],post,Top,Count,#iterator.prev,#kvs{mod=?DBA});
         _ -> []
     end,    
@@ -101,23 +103,25 @@ render(controls=Panel,#st{board=#board{feed_id={board,PartyId}}=B}=S) ->
                 postback=erlach_qs:mp({stream,B}),href=erlach_qs:ml({stream,B})}
             ]}.
 
+%%% Render/3
+%%%
 render(last,#hes{board=#board{}=B,thread=#post{id=Tid}=T}=Hes,#st{}=S) ->
     LastPostsCount=wf:config(erlach,last_posts_count,3),
     Elements=case kvs:get(feed,{post,Tid}) of
-        {ok, #feed{count=C}=F} ->
-            LastPosts=kvs:entries(F,post,LastPostsCount),
-            Info=case C > LastPostsCount of
-                true -> #panel{class=omitted,body=#panel{class= <<"post-content">>,body=[
-                        % #panel{class= <<"post-message">>,body=[wf:to_list(C-LastPostsCount),<<" messages omitted">>]}]}};
+        {ok, #feed{top=Top,count=FeedCount}=F} ->
+            Count = min(FeedCount, LastPostsCount),
+            LastPosts = kvs:fold(fun(T,Acc) -> [T|Acc] end,[],post,Top,Count,#iterator.prev,#kvs{mod=?DBA}),
+            Info=case FeedCount > LastPostsCount of
+                true ->
+                    #panel{class=omitted,body=#panel{class= <<"post-content">>,body=[
                         #panel{class= <<"post-message">>,body=[
-                            wf:to_list(C-LastPostsCount),
+                            wf:to_list(FeedCount-LastPostsCount),
                             ?TR(<<" ответов пропущено"/utf8>>,
                                 <<" replies omitted"/utf8>>,
                                 <<" відповідей пропущено"/utf8>>)]}]}};
                 false -> []
             end,
             Hes2=Hes#hes{thread=T,board=B},
-            % spa:info(wf:jse(wf:to_list(spa:option(limit,Hes2,"undef")))),
             LastElements=[ render(P,Hes2,S) || P <- LastPosts ],
             [Info,LastElements];
         _ -> []
@@ -129,10 +133,8 @@ render({'post-header',#post{type=thread,id=Tid}=T},#hes{board=#board{}=B}=Hes,#s
         #a{class= <<"post-topic">>,href=erlach_qs:ml({thread,B,T}),postback=erlach_qs:mp({thread,B,T}),body=erlach_thread:topic(T)},
         render({'post-info',T},Hes,S)
         ]}};
-
 render({'post-header',#post{type=post}=P},#hes{}=Hes,#st{}=S) ->
     [];
-
 render({'post-info',#post{id=Tid,type=thread}=T},#hes{board=#board{}=B}=Hes,#st{}=S) ->
     wf:info(?M,"post-info: ~p",[Tid]),
     PostCount=erlach_thread:count(Tid),

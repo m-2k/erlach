@@ -6,7 +6,7 @@
 -record(state,{queue = [], entry_map = #{}, port_map = #{}}).
 -record(entry,{
     id, group, meta, source, destination, target, finally, error, autostart=true, % user defined
-    storage, path, port, from, infoA, infoB, stage                                % private
+    storage, path, port, from, infoA, infoB, stage, req                           % private
 }).
 
 -define(IMAGE_INFO, width, height, size = 0, alpha = false, animation = false, bit_depth = 8, color_space).

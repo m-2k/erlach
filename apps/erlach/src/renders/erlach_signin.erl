@@ -9,12 +9,18 @@
 title(#st{}) -> <<"Sign in – Erlach"/utf8>>.
 urn() -> <<"signin">>.
 
+is_allow_signin() -> true =:= wf:config(erlach,auth,false).
 
 init(#route{}=Route) ->
     wf:info(?M,"init ~p",[self()]),
-    case eauth_user:is_alive(eauth_user:get()) of
-        true -> spa:redirect(erlach_qs:mp(main));
-        false -> {ok,#st{user=?UNDEF,route=Route,action=view}}
+    
+    case is_allow_signin() of
+        false -> {redirect,erlach_qs:mp(main)};
+        true ->
+            case eauth_user:is_alive(eauth_user:get()) of
+                true -> {redirect,erlach_qs:mp(main)};
+                false -> {ok,#st{user=?UNDEF,route=Route,action=view}}
+            end
     end.
 finalize(#st{}) -> wf:info(?M,"finalize ~p",[self()]).
 terminate() -> wf:info(?M,"terminate ~p",[self()]).
@@ -68,7 +74,7 @@ render_reset() ->
             #button{class=[xl,sea],
                 body=?TR(<<"Сбросить пароль"/utf8>>,<<"Reset password">>,<<"Скинути пароль"/utf8>>),
                 onclick="this.disabled = true",
-                postback=#render_event{target=auth,event=reset},source=[login]},
+                postback=#render_event{target=auth,event=reset_activate},source=[login]},
             #panel{class=addition,body=#a{class=[signin,xl,sea],body=?TR(<<"Войти по паролю"/utf8>>,
                 <<"Sign in with password">>,<<"Зайти з паролем"/utf8>>),
                 postback=erlach_qs:mp(signin)}}
@@ -133,6 +139,26 @@ event(#render_event{target=auth,event=reset}) ->
                     end
             end,
             erlach_markup:highlight(succ),
+            spa:redirect((erlach_qs:mp({signin,<<"reset-password">>}))#postback{history=false,route_option={status,{ok,Mail}}})
+    end;
+event(#render_event{target=auth,event=reset_activate}) ->
+    case wf:q(login) of
+        <<>> -> warning(<<"Надо же мыло ввести"/utf8>>,<<"Mail required">>);
+        Mail ->
+            ResetMessageFun=fun(Password,Key) ->
+                ActivateUrl=[wf:config(erlach,domain,<<"https://erlach.co">>),"/",urn(),"/",Key],
+                Subject="Reset password for you account",
+                Body=["<h1>You password has been resetting on Erlach Imageboard Services</h1>",
+                    "<p>You login: ",wf:html_encode(Mail),"</p>",
+                    "<p>You NEW password: ",wf:html_encode(Password),"</p>",
+                    "<p>Click this link to activate account with new credentials: <a href=\"",ActivateUrl,"\">Activate account in Erlach</a></p>"],
+                {Subject,Body}
+            end,
+
+            case eauth:reset(Mail,ResetMessageFun,[activate]) of
+                {error,_} -> skip;
+                {ok,Mail} -> erlach_markup:highlight(succ)
+            end,
             spa:redirect((erlach_qs:mp({signin,<<"reset-password">>}))#postback{history=false,route_option={status,{ok,Mail}}})
     end;
 event(#render_event{target=auth,event=logout}) ->

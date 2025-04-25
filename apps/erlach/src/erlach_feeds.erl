@@ -24,9 +24,15 @@ delete(#post{type=thread}=T) ->
     kvs_feeds:purge(T,fun() -> [{feed,post,fun delete/1}] end);
 delete(#post{}=P) ->
     delete_post(P);
-delete(#attachment{info=I}=A) ->
+delete(#attachment{name=N,path=P,info=I}=A) ->
     kvs_feeds:delete(A),
-    case I of ?UNDEF -> skip; _ -> file:delete(erlach_thread:path(A)) end.
+    case I of
+        ?UNDEF ->
+            skip;
+        _ ->
+            Path=fun(End) -> filename:join([erlach_thread:storage(),P,[N,End]]) end,
+            [ file:delete(Path(End)) || End <- [erlach_image:ext(I),<<"-R512.jpg">>,<<"-R256.jpg">>,<<"-R128.jpg">>]]
+    end.
 
 
 % Private funs

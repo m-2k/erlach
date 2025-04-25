@@ -1,5 +1,5 @@
 -define(APP, erlach).
--define(ERLACH_VERSION, <<"R3 RC9">>).
+-define(ERLACH_VERSION, <<"R3 RC10">>).
 -define(ERLACH_VERSION_NUMBER, 2.993).
 
 -include_lib("n2o/include/wf.hrl").
@@ -81,6 +81,7 @@
 
 
 %%% Global events
+-record(ban, { ?RDR_EV(erlach_ban), value, reason= <<>>, expire=infinity }).
 -record(auth, { ?RDR_EV(erlach_auth), user, passwd, logout }).
 -define(RDR_PUBSUB_RENDER,erlach_subscription).
 

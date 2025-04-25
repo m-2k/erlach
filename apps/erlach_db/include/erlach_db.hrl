@@ -4,6 +4,8 @@
 -include_lib("kvs/include/kvs.hrl").
 -include_lib("kvs/include/feed.hrl").
 
+-record(bastard,  {id :: {atom(), any()}, value, created, group = noname, expire = infinity, reason = [], opts = []}).
+
 -record(statistic,  {id, value, group = noname, opts = []}).
 
 -define(DB_ELEMENT(Container),

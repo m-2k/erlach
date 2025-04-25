@@ -6,13 +6,12 @@
 
 
 % rp(erlach_auth:request()).
-% erlach_auth:set(su,erlach_auth:hash(erlach_auth:pass())).
-bfg() -> set(su,hash(pass())), io:fwrite("~p~n", [request()]).
+% erlach_auth:set(su,erlach_utils:hash(erlach_auth:pass())).
+bfg() -> set(su,erlach_utils:hash(pass())), io:fwrite("~p~n", [request()]).
 unbfg() -> clear().
 
 pass() -> <<209,130,209,139,32,209,133,209,131,208,185>>.
 % For output use rp/1.
-hash(Pass) -> crypto:hash(sha512,Pass).
 set(User,Hash) -> application:set_env(erlach,auth,{User,Hash}).
 clear() -> application:unset_env(erlach,auth).
 state() -> application:get_env(erlach,auth,?UNDEF).
@@ -23,7 +22,7 @@ clear_user() -> erlang:erase({?M,user}).
 access() -> case user() of su -> full; _ -> ?UNDEF end.
 
 check(User,Passwd) when is_atom(User) and is_binary(Passwd) ->
-    Hash=hash(Passwd),
+    Hash=erlach_utils:hash(Passwd),
     case application:get_env(erlach,auth) of {ok,{User,Hash}} -> true; _ -> false end;
 check(_,_) -> false.
 

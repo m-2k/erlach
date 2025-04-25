@@ -55,7 +55,7 @@ convert(Key,Group,Source,Storage,Path,Meta,Target,FinallyFun,ErrorFun,AutoStart)
     case n2o_async:pid({?SUP_CLASS,Group}) of Pid when is_pid(Pid) -> ok; _ -> restart(Group) end,
     E=#entry{id=Key,group=Group,
         source=Source,storage=Storage,path=Path,meta=Meta,target=Target,
-        finally=FinallyFun,error=ErrorFun,autostart=AutoStart,from=self()},
+        finally=FinallyFun,error=ErrorFun,autostart=AutoStart,from=self(),req=?REQ},
     n2o_async:send(?SUP_CLASS,Group,{insert_entry,E}).
 
 run(Key,Group) ->
@@ -239,22 +239,31 @@ proc({abort_entry,Key,User},#handler{state=#state{entry_map=EM}=S}=H) -> % TODO:
     {reply,ok,H#handler{state=S2}};
 proc({Port,{exit_status,0}},#handler{state=#state{queue=Q,entry_map=EM,port_map=PM}=S}=H) ->
     wf:info(?M,"(~p) Spawn finished ~p",[self(),Port]),
-    S3=case find_entry(Port,S) of
-        {ok,#entry{stage=finishing}=E} ->
-            S2=finally(E,S),
-            self() ! {command,check_queue},
-            clear(E,S2);
+    case find_entry(Port,S) of
+        {ok,#entry{stage=finishing,destination=DP,req=Req}=E} ->
+            case erlach_ban:check({attachment,hash,DP},Req) of
+                ok ->
+                    S2=finally(E,S),
+                    self() ! {command,check_queue},
+                    S3 = clear(E,S2),
+                    {reply,ok,H#handler{state=S3}};
+                Error ->
+                    wf:warning(?M,"(~p) Skiping finishing (BANNED) ~p",[self(),Port]),
+                    S2 = error(E,{error,Error},S),
+                    {reply,error,H#handler{state=S2}}
+            end;
         {ok,#entry{}=E} ->
-            case spawn_external(E,S) of
+            S3 = case spawn_external(E,S) of
                 {ok,S2} -> S2;
                 Error -> error(E,Error,S)
-            end;
+            end,
+            {reply,ok,H#handler{state=S3}};
         error ->
             wf:warning(?M,"(~p) Skiping finishing ~p",[self(),Port]),
             self() ! {command,check_queue},
-            S
-    end,
-    {reply,ok,H#handler{state=S3}};
+            {reply,ok,H#handler{state=S}}
+    end;
+    
 % получены данные Data от внешнего приложения
 % proc({Port,{data,Data}},H) -> {reply,ok,H};
 % ответ на {Port, close}

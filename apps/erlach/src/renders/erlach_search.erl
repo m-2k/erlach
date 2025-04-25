@@ -104,7 +104,6 @@ cache(Table,Id,#{}=Cache) ->
         {ok,E} -> {E,Cache};
         error ->
             {ok,E}=kvs:get(Table,Id),
-            % case E of #post{type=post} -> {E,Cache}; _ -> {E,maps:put({Table,Id},E,Cache)} end
             {E,maps:put({Table,Id},E,Cache)}
     end.
     

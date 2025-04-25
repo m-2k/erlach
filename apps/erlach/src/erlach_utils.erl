@@ -74,7 +74,7 @@ link(H,#post{type=post,id=Pid,feed_id={post,Tid},urn=Urn}=P,#st{}) ->
         body=[enc([?RPL,Urn]),#sup{body="ext"}],
         href=Href,
         postback=erlach_qs:mp({post,B,T,P}) }.
-        
+
 partial(#view{partial=true,table=Table,feed=Feed,start=Start,count=Count,direction=Direction}=V) ->
     case kvs:get(feed,Feed) of
         {ok,C} ->
@@ -96,7 +96,7 @@ partial(#view{partial=true,table=Table,feed=Feed,start=Start,count=Count,directi
             end;
         _ -> {[],stop}
     end.
-    
+
 %%% when u want stopped fold, then just raise any error https://github.com/synrc/kvs/blob/3.4/src/kvs.erl#L216
 fold(Fun,Table,Container,Feed,Acc) ->
     case kvs:get(Container,Feed) of
@@ -114,3 +114,5 @@ cut(Any,Limit,End) ->
         true -> [unicode:characters_to_binary(lists:sublist(Chars,Limit),utf8),End];
         false -> [Any]
     end).
+    
+hash(Data) -> crypto:hash(sha512,Data).

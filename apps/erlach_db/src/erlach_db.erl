@@ -29,8 +29,9 @@ metainfo() ->
         #table{name=party,container=feed,fields=record_info(fields,party),keys=[]},
         #table{name=board,container=feed,fields=record_info(fields,board),keys=[urn]},
         #table{name=post,container=feed,fields=record_info(fields,post),keys=[]},
-        #table{name=attachment,container=feed,fields=record_info(fields,attachment),keys=[]},
-        #table{name=statistic,fields=record_info(fields,statistic),keys=[]}
+        #table{name=attachment,container=feed,fields=record_info(fields,attachment),keys=[hash]},
+        #table{name=statistic,fields=record_info(fields,statistic),keys=[]},
+        #table{name=bastard,fields=record_info(fields, bastard),keys=[]}
         ]}.
 
 init_db() ->

@@ -1,7 +1,7 @@
 -module(erlach_log).
 -compile(export_all).
 
-log_level() -> wf:config(erlach,log_level,warning).
+log_level() -> wf:config(erlach,log_level,info).
 log_modules() ->
     wf:config(erlach,log_modules,[
 
@@ -22,7 +22,7 @@ log_modules() ->
         spa_filter,
         spa_image,
         spa_lambda_event,
-        % spa_proxy,
+        spa_proxy,
         spa_record_manager,
         spa_render,
         spa_statistic,
@@ -54,6 +54,7 @@ log_modules() ->
         erlach_signin,
         erlach_join,
         erlach_search,
+        erlach_ban,
         
         eauth,
         eauth_event,

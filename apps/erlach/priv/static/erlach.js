@@ -408,7 +408,6 @@ function textRestore() {
 function uploadFileStarting(state) {
     debug && console.log('uploadFileStarting');
     var p = qs('#input .image-process');
-    // p && p.innerText = state;
     p && p.classList.remove('error');
     p && p.classList.add('visibled');
     var m = qs('#input .image-manage');
@@ -467,7 +466,7 @@ function previewAndUploadFile(file) {
     var img = container.querySelector('img.media.image');
     var cnv = container.querySelector('canvas.media.image');
     var temp = new Image(); // for preventing infinity iteration of img.media
-
+    
     if(container) {
         var reader  = new FileReader();
         reader.onloadend = function () {
@@ -565,7 +564,7 @@ var BPGOnMessage = function(e) {
                 var cnv = qs('[id="' + e.data.meta.container + '"] canvas.media.image');
                 cnv.width = img.width;
                 cnv.height = img.height;
-                
+
                 cnv.bpg = {image: img, frames: frames, loop_count: loop_count, animation: frames.length > 1 };
                 if(cnv.bpg.animation) { setBPGAnimation(cnv);  cnv.stop(); }
                 else { cnv.getContext('2d').putImageData(img, 0, 0); }
@@ -1142,6 +1141,7 @@ function snowFlake(ctx,x,y,size,color,type,rotation,derection) {
     
     switch(type) {
         case 1:
+            // https://jsfiddle.net/okkpbgh1/1/
             size *= 2;
             var c = {x:x, y:y}, fx, ff, f = rotation*derection;
             fx = type === 1 ? 0.7 : type === 2 ? 0.5 : 0.3;

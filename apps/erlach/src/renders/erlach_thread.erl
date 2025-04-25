@@ -98,7 +98,14 @@ render(content=Panel,#st{thread=#post{id=Tid}=T,board=B}=S) ->
             #panel{id=Container,body=lists:foldl(fun(P,A) -> [render(P,#hes{thread=T,board=B},S)|A] end,[],Instant)},
             #panel{id= <<"posts-new">>},
             render('posts-new-controls',S),
-            case is_archived(S) of true -> []; false -> #media_input{id=input,target=post,disabled=true} end
+            case is_archived(S) of
+                true -> [];
+                false ->
+                    case erlach_ban:check(ip,?REQ) of
+                        ok -> #media_input{id=input,target=post,disabled=true};
+                        _ -> []
+                    end
+            end
         ]};
 
 render('posts-new-controls'=Panel,#st{}) ->
@@ -156,16 +163,21 @@ render({imagePanel,Aid},#hes{board=B},#st{}=S) ->
     
 render({'post-header',#post{type=thread,id=Tid}=T},#hes{}=Hes,#st{}=S) ->
     [];
-
 render({'post-header',#post{type=post}=P},#hes{}=Hes,#st{}=S) ->
     [];
 
-render({'post-manage',#post{id=Id,created=Ts,type=Type}=P},#hes{}=Hes,#st{access=A}=S) ->
+render({'post-manage',#post{id=Id,created=Ts,type=Type,image=I}=P},#hes{}=Hes,#st{access=A}=S) ->
     UTC=spa_utils:now_js(Ts),
     Panel=spa:id({manage,Id}),
     PostPanel=erlach_utils:post_id(P),
     #panel{id=Panel,class= <<"post-manage">>,body=[
         case A of full -> #a{class=[b,warn],body= <<"Удалить"/utf8>>,postback=#delete{target=Type,value=Id}}; _ -> [] end,
+        case {is_integer(I),A} of
+            {true,full} ->
+                [ #a{class=[b,warn],body= <<"Удалить пикчу"/utf8>>,postback=#delete{target=attachment,value=I}},
+                #a{class=[b,warn],body= <<"Бан по пикче"/utf8>>,postback=#ban{target=attachment,value=I,reason= <<"Bullshit image">>, expire=infinity}} ];
+            _ -> []
+        end,
         case spa:render(S) of
             ?THREAD -> render(reply,Hes,S);
             ?SERVICES -> render(reply,Hes,S);
@@ -199,7 +211,6 @@ render(links,#hes{post=#post{id=Pid,links=Links}},#st{}=S) ->
                 #span{class=ru,body= <<"Ответы:"/utf8>>},
                 #span{class=en,body= <<"Replies:"/utf8>>} ]},LinkElements]}
     end;
-
 render(#post{type=thread,id=Tid,urn=Urn,links=Links,message_escaped=Message,image=Image}=T,#hes{board=B}=Hes,#st{}=S) ->
     Panel=erlach_utils:post_id(T),
     #panel{id=Panel,class= <<"post head">>,
@@ -308,8 +319,10 @@ event(#add{target=Target,forms=[TopicOrSage,Input,Selector]}) when Target =:= th
                         view=View,
                         width=Width,
                         height=Height},
-                    {ok,_}=erlach_feeds:append(A),
-                    erlach_stat:incr(attachment,{Bid,Tid,A}),
+                    A2=A#attachment{hash=hash(A)},
+                    wf:info(?M,"Adding attachment ~p",[A2]),
+                    {ok,_}=erlach_feeds:append(A2),
+                    erlach_stat:incr(attachment,{Bid,Tid,A2}),
                     Aid;
                 _ ->
                     ?UNDEF
@@ -507,6 +520,19 @@ event(#render_event{target=input,event={sage,Boolean,Sage}}) when is_boolean(Boo
             #span{class=en,body= <<"Sage"/utf8>>},
             #span{class=ua,body= <<"Сажи"/utf8>>} ],value=Boolean});
     
+event(#delete{target=attachment,value=Id}) -> % attachment
+    wf:info(?M,"Removing attachment ~p",[Id]),
+    case kvs:get(attachment,Id) of
+        {ok,#attachment{thread=Tid,post=Pid}=A} ->
+            erlach_feeds:delete(A),
+            case {is_integer(Pid), kvs:get(post,Tid), kvs:get(post,Pid)} of
+                {true,_,{ok,P}} -> % post image
+                    wf:send({thread,Tid},{server,#pubsub{target=content,action=update,data=P,from=self()}});
+                {false,{ok,#post{type=thread,feed_id={thread,Bid}}=T},_} -> % thread image
+                    wf:send({thread,Bid},{server,#pubsub{target=content,action=update,data=T,from=self()}})
+            end;
+        _ -> skip
+    end;
 event(#delete{target=thread,value=Tid}) -> % thread
     wf:info(?M,"Removing thread ~p",[Tid]),
     case kvs:get(post,Tid) of
@@ -572,7 +598,6 @@ event(#ftp{sid=Sid,status={event,init},filename=FileName,meta={meta,TempContaine
 event(#ftp{sid=Sid,status={event,stop},filename=FileName,meta={meta,ImageContainer,_Width,_Height},size=Size}=Ftp) ->
     wf:info(?M,"IMAGE DOWNLOADED ~p ~p ~p ~p",[self(),FileName,Size,ImageContainer]),
     self() ! {server,{upload_state,ImageContainer,"Processing"}},
-    
     Key=key(Ftp),
     Group=key_group(),
     erlach_image:run(Key,Group);
@@ -629,13 +654,18 @@ convert_abort() ->
     wf:warning(?M,"DEBUG ~p",[{4,convert_abort,self()}]),
     ok.
 convert_finally(#entry{id=Key,meta=Aid,infoA=InfoA,infoB=InfoB,path=P}=Entry) when is_integer(Aid) ->
-    {ok,Attachment}=kvs:get(attachment,Aid),
-    [W,H,IType]=[erlach_image:w(InfoB),erlach_image:h(InfoB),erlach_image:type(InfoB)],
-    {ok,_}=erlach_feeds:update(Attachment,fun(#attachment{}=A) ->
-        {ok,A#attachment{name=Key,path=P,width=W,height=H,type=IType,original_info=InfoA,info=InfoB}}
-    end),
-    wf:warning(?M,"DEBUG ~p",[{5,convert_finally,self(),Entry}]),
-    ok;
+    case kvs:get(attachment,Aid) of
+        {ok,Attachment} ->
+            [W,H,IType]=[erlach_image:w(InfoB),erlach_image:h(InfoB),erlach_image:type(InfoB)],
+            Hash=hash(Attachment#attachment{name=Key,path=P,info=InfoB}),
+            {ok,_}=erlach_feeds:update(Attachment,fun(#attachment{}=A) ->
+                {ok,A#attachment{name=Key,path=P,width=W,height=H,type=IType,original_info=InfoA,info=InfoB,hash=Hash}}
+            end),
+            wf:info(?M,"DEBUG ~p",[{5,convert_finally,self(),Entry}]),
+            ok;
+        Error ->
+            wf:error(?M,"DEBUG ~p",[{'5a',convert_finally,self(),Error,Entry}])
+    end;
 convert_finally(Entry) ->
     wf:warning(?M,"DEBUG ~p",[{6,convert_finally,self(),Entry}]),
     skip.
@@ -678,3 +708,15 @@ url(Path,FileName) -> filename:join([wf:config(erlach,storage_urn),wf:to_binary(
 url(#attachment{name=N,path=P,info=I}) -> url(P,[N,erlach_image:ext(I)]).
 
 path(#attachment{name=N,path=P,info=I}) -> filename:join([storage(),P,[N,erlach_image:ext(I)]]). % for erlach_feeds
+
+hash(#attachment{}=A) ->
+    FilePath=path(A),
+    case file:read_file(FilePath) of
+        {ok,Data} ->
+            wf:info(?MODULE,"Hash for file ~p OK",[FilePath]),
+            erlach_utils:hash(Data);
+        {error,enoent} ->
+            wf:warning(?MODULE,"Hash error, file ~p not found",[FilePath]),
+            ?UNDEF
+    end.
+

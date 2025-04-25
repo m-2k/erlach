@@ -97,6 +97,10 @@ input[type=text]:focus, input[type=password]:focus {
     margin-left: 0.06rem;
     margin-right: 0.06rem;
 }
+.board-list .blue, button:not(.l) {
+    font-weight: normal;
+}
+
 button {
     cursor: pointer;
     font-weight: 100;
@@ -1024,8 +1028,8 @@ canvas, img { animation-duration: 0.15s; }
 .media.hidden { display: none; }
 
 .board-list .count {
-    font-size: 0.3rem;
-    color: #555;
+    font-size: 0.7rem;
+    color: #43585b;
     vertical-align: text-top;
 }
 
